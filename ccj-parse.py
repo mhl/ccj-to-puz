@@ -1,9 +1,16 @@
 #!/usr/bin/python3
 
 # This script takes a .ccj file on standard input and can output the
-# crossword in something like the AcrossLite .PUZ binary format
-# suitable for loading into xword.  Use --help or -h for usage
+# crossword in something like the AcrossLite .puz binary format
+# suitable for loading into xword. [1]  Use --help or -h for usage
 # information.
+#
+#  [1] apt-get install xword
+#
+# You need the Debian version 1.04 of xword.
+#
+# Note that this script was written with guesswork based on looking at
+# example CCJ files.
 
 import sys
 import re
@@ -418,6 +425,9 @@ if options.output_filename:
         number_string_tidied = re.sub('/',',',c.number_string)
         number_string_tidied = number_string_tidied.lower()
         clue_text = c.tidied_text_including_enumeration()
+        # We have to stick the number string at the beginning
+        # otherwise it won't be clear when the answers to clues cover
+        # several entries in the grid.
         clue_text = "["+number_string_tidied+"] "+clue_text
         f.write(clue_text)
         f.write(nul)
