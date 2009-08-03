@@ -47,19 +47,41 @@ from commonccj import *
 # Make sys.stdin binary:
 d = sys.stdin.buffer.read()
 
+import unicodedata
+def contains_control_characters(s):
+    for c in s:
+        if unicodedata.category(c) == 'Cc':
+            return True
+    return False
+
 # Not sure about character set issues here, but it seems that 0x03
-# turns on italic and 0x01 turns it off, but there may be several
-# random 0x01 bytes before the enumeration.  Try UTF-8 first, then
-# ISO-8859-1 and then give up.
+# turns on italic and 0x01 turns it off. In addition, there may be
+# several random 0x01 bytes before the enumeration.  We remove any
+# 0x01 or 0x03 bytes first.  Then try UTF-8 decoding - if that doesn't
+# succeed, try Windows 1252 and ISO-8859-1, giving up if there are
+# control characters left after decoding..
+
+def decode_bytes(b):
+    b = bytes(filter(lambda c: (c != 0x01) and (c != 0x03), b))
+    try:
+        s = b.decode('utf_8')
+        return s
+    except UnicodeDecodeError:
+        # Try ISO-8859-1 first, then Windows 1252 if
+        # there are unprintable characters in the
+        # decoded version.
+        s = b.decode('latin_1')
+        if not contains_control_characters(s):
+            return s
+        s = b.decode('cp1252')
+        if not contains_control_characters(s):
+            return s
+        raise Exception("Couldn't guess the character set.")
 
 def read_string(data,start_index):
     length = int(data[start_index])
     bytes_for_string = data[(start_index+1):(start_index+length+1)]
-    s = None
-    try:
-        s = bytes_for_string.decode('UTF-8')
-    except UnicodeDecodeError:
-        s = bytes_for_string.decode('ISO-8859-15')
+    s = decode_bytes(bytes_for_string)
     return (s,start_index+length+1)
 
 # i is the index into the file for the rest of this script:
@@ -428,8 +450,12 @@ if options.output_filename:
         # We have to stick the number string at the beginning
         # otherwise it won't be clear when the answers to clues cover
         # several entries in the grid.
-        clue_text = "["+number_string_tidied+"] "+clue_text
-        f.write(clue_text)
+        f.write("["+number_string_tidied+"] ")
+        # Encode the clue text as UTF-8, because it's not defined what
+        # the character set should be anywhere that I've seen.  (xword
+        # currently assumes ISO-8859-1, but that doesn't strike me as
+        # a good enough reason in itself, since it's easily patched.)
+        f.write(clue_text.encode('UTF-8'))
         f.write(nul)
     f.write(nul)
     f.close()
