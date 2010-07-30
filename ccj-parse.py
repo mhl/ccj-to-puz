@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python3.1
 
 # This script takes a .ccj file on standard input and can output the
 # crossword in something like the AcrossLite .puz binary format
