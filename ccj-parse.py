@@ -450,7 +450,7 @@ if options.output_filename:
         # We have to stick the number string at the beginning
         # otherwise it won't be clear when the answers to clues cover
         # several entries in the grid.
-        f.write("["+number_string_tidied+"] ")
+        f.write(("["+number_string_tidied+"] ").encode('UTF-8'))
         # Encode the clue text as UTF-8, because it's not defined what
         # the character set should be anywhere that I've seen.  (xword
         # currently assumes ISO-8859-1, but that doesn't strike me as
