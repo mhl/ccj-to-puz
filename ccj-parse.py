@@ -259,7 +259,7 @@ class IndependentClue:
         self.number_string = clue_number_string
         if self.across == None:
             raise Exception("Trying to call self.set_number() before self.across is set")
-        self.all_clue_numbers = list(map( lambda x: clue_number_string_to_duple(self.across,x), clue_number_string.split('/') ))
+        self.all_clue_numbers = list(map( lambda x: clue_number_string_to_duple(self.across,x), re.split('[,/]',clue_number_string)))
 
 def parse_list_of_clues(data,start_index):
     result = ListOfClues()
