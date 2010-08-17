@@ -385,7 +385,7 @@ for across in (True,False):
             else:
                 expected_dictionary = down_clues.clue_dictionary
             if a != across:
-                clue_string += a and " across" or "down"
+                clue_string += a and " across" or " down"
             ekeys = list(expected_dictionary.keys())
             if not n in ekeys:
                 fake_clue = IndependentClue()
