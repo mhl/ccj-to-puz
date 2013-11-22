@@ -60,8 +60,8 @@ def contains_control_characters(s):
 # several random 0x01 bytes before the enumeration.  We remove any
 # 0x01 or 0x03 bytes first.  Then try UTF-8 decoding - if that doesn't
 # succeed, try Windows 1252 and ISO-8859-1, giving up if there are
-# control characters left after decoding..
-
+# control characters left after decoding and replacing newlines with
+# spaces.
 def decode_bytes(b):
     b = bytes(filter(lambda c: (c != 0x01) and (c != 0x03), b))
     try:
@@ -72,9 +72,13 @@ def decode_bytes(b):
         # there are unprintable characters in the
         # decoded version.
         s = b.decode('latin_1')
+        s = re.sub('\s+', ' ', s)
+        print("string (after latin_1) now looks like:", repr(s))
         if not contains_control_characters(s):
             return s
         s = b.decode('cp1252')
+        s = re.sub('\s+', ' ', s)
+        print("string (after cp1252) now looks like:", repr(s))
         if not contains_control_characters(s):
             return s
         raise Exception("Couldn't guess the character set.")
