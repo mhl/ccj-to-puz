@@ -22,33 +22,6 @@ import unicodedata
 
 from commonccj import *
 
-parser = OptionParser()
-parser.add_option('-o', "--output", dest="output_filename",
-                  default=False, help="output in a broken .PUZ format")
-parser.add_option('-d', "--date", dest="date",
-                  help="specify the date of this crossword")
-parser.add_option('-v', '--verbose', dest='verbose', action="store_true",
-                  default=False, help='verbose output')
-parser.add_option('-t', '--title', dest='title',
-                  help="specify the crossword title")
-parser.add_option('-a', '--author', dest='author',
-                  help="specify the crossword author or setter")
-parser.add_option('-n', '--number', dest='puzzle_number',
-                  help="specify the puzzle number")
-parser.add_option('-c', '--copyright', dest='copyright',
-                  help="specify the copyright message")
-
-(options, args) = parser.parse_args()
-
-date_string = None
-if options.date:
-    if not re.search("^\d{4}-\d{2}-\d{2}",options.date):
-        raise Exception("Unknown date format, must be YYYY-MM-DD")
-    date_string = options.date
-
-# Make sys.stdin binary:
-d = sys.stdin.buffer.read()
-
 def contains_control_characters(s):
     for c in s:
         if unicodedata.category(c) == 'Cc':
@@ -88,6 +61,170 @@ def read_string(data,start_index):
     bytes_for_string = data[(start_index+1):(start_index+length+1)]
     s = decode_bytes(bytes_for_string)
     return (s,start_index+length+1)
+
+# There sometimes seems to be a succession of bytes here in groups of
+# repeated groups of four, next - this function tests for the patterns
+# I've seen:
+
+def skippable_block_of_four(data,start_index):
+    if d[i] == 0x00 and d[i+1] == 0xff and d[i+2] == 0xff and d[i+3] == 0xff:
+        return True
+    elif d[i] == 0x00 and d[i+1] == 0x00 and d[i+2] == 0xff and d[i+3] == 0xff:
+        return True
+    elif d[i] == 0x00 and d[i+1] == 0x00 and d[i+2] == 0x00 and d[i+3] == 0x00:
+        return True
+    else:
+        return False
+
+def reduce_coordinate(x):
+    if x >= 0x80:
+        return x - 0x80
+    else:
+        return x
+
+def read_clue_start_coordinates(data,start_index):
+    # My assumption is that if the first byte is >= 0x80 then it's a
+    # list of coordinates terminated by a NUL, otherwise it's just two
+    # bytes with the coordinate:
+    start_coordinates = []
+    if data[start_index] >= 0x80:
+        i = start_index
+        while data[i] != 0:
+            x = reduce_coordinate(data[i])
+            y = reduce_coordinate(data[i+1])
+            start_coordinates.append( (x,y) )
+            i += 2
+        return (start_coordinates,i+1)
+    else:
+        x = reduce_coordinate(data[start_index])
+        y = reduce_coordinate(data[start_index+1])
+        start_coordinates.append( (x,y) )
+        return (start_coordinates,start_index+2)
+
+def parse_list_of_clues(data,start_index):
+    result = ListOfClues()
+    i = start_index
+    # Read the label for this list of clues:
+    result.label, i = read_string(data,i)
+    if options.verbose:
+        print("clue set label is: "+result.label)
+    result.across = None
+    if re.search("(?ims)across",result.label):
+        result.across = True
+    elif re.search("(?ims)down",result.label):
+        result.across = False
+    else:
+        raise Exception("Couldn't find either /across/i or /down/i in label: '"+str(result.label)+"'")
+    # Skip some bytes:
+    result.unknown_bytes = data[i:i+3]
+    i += 3
+    if options.verbose:
+        print("  Before list of clues, got these unknown bytes:")
+        for b in result.unknown_bytes:
+            print("    "+str(b))
+    result.number_of_clues = data[i]
+    if options.verbose:
+        print("number of clues is: "+str(result.number_of_clues))
+    i += 1
+    clues_found = 0
+    while True:
+        if options.verbose:
+            print("--------------------------")
+        clue = IndependentClue()
+        clue.across = result.across
+        clue.start_coordinates, i = read_clue_start_coordinates(data,i)
+        if options.verbose:
+            for c in clue.start_coordinates:
+                print("A start at x: "+str(c[0])+", y: "+str(c[1]))
+        s, i = read_string(data,i)
+        clue.set_number(s)
+        if options.verbose:
+            print("clue number: "+clue.number_string)
+            print("all clue numbers: "+(", ".join(map(lambda x: str(x[0])+(x[1] and "A" or "D"), clue.all_clue_numbers))))
+        # Skip a NUL:
+        if data[i] != 0:
+            raise Exception("After clue number we expect a NUL to skip over")
+        i += 1
+        clue.text_including_enumeration, i = read_string(data,i)
+        if options.verbose:
+            print("clue text: "+clue.text_including_enumeration)
+        result.clue_dictionary[clue.all_clue_numbers[0][0]] = clue
+        clues_found += 1
+        if clues_found >= result.number_of_clues:
+            break
+    return result, i
+
+# This function is for sorting clues before output, we want them to be
+# in the order the number appear in the grid, with across before down
+# if there's a choice:
+
+def keyfunc_clues(x):
+    across_for_sorting = 1
+    if x.across:
+        across_for_sorting = 0
+    return ( x.all_clue_numbers[0][0], across_for_sorting )
+
+# A convenience class - we have one object of this class for all the
+# across clues and another object of this class for the down clues:
+
+class ListOfClues:
+    def __init__(self):
+        self.number_of_clues = None
+        self.label = None
+        self.clue_dictionary = {}
+        self.across = None
+        self.unknown_bytes = None
+    def ordered_list_of_clues(self):
+        keys = sorted(self.clue_dictionary.keys())
+        return list(map(lambda x: self.clue_dictionary[x], keys))
+    def real_number_of_clues(self):
+        return len(self.clue_dictionary)
+
+# Just to store a single clue:
+
+class IndependentClue:
+    def __init__(self):
+        self.number_string = None
+        self.text_including_enumeration = None
+        self.start_coordinates = None
+        self.across = None
+        self.all_clue_numbers = None
+    def tidied_text_including_enumeration(self):
+        t = re.sub('[\x00-\x1f]','',self.text_including_enumeration)
+        t = re.sub(' *\(',' (',t)
+        return t
+    def set_number(self,clue_number_string):
+        self.number_string = clue_number_string
+        if self.across == None:
+            raise Exception("Trying to call self.set_number() before self.across is set")
+        self.all_clue_numbers = list(map( lambda x: clue_number_string_to_duple(self.across,x), re.split('[,/]',clue_number_string)))
+
+parser = OptionParser()
+parser.add_option('-o', "--output", dest="output_filename",
+                  default=False, help="output in a broken .PUZ format")
+parser.add_option('-d', "--date", dest="date",
+                  help="specify the date of this crossword")
+parser.add_option('-v', '--verbose', dest='verbose', action="store_true",
+                  default=False, help='verbose output')
+parser.add_option('-t', '--title', dest='title',
+                  help="specify the crossword title")
+parser.add_option('-a', '--author', dest='author',
+                  help="specify the crossword author or setter")
+parser.add_option('-n', '--number', dest='puzzle_number',
+                  help="specify the puzzle number")
+parser.add_option('-c', '--copyright', dest='copyright',
+                  help="specify the copyright message")
+
+(options, args) = parser.parse_args()
+
+date_string = None
+if options.date:
+    if not re.search("^\d{4}-\d{2}-\d{2}",options.date):
+        raise Exception("Unknown date format, must be YYYY-MM-DD")
+    date_string = options.date
+
+# Make sys.stdin binary:
+d = sys.stdin.buffer.read()
 
 # i is the index into the file for the rest of this script:
 i = 2
@@ -175,20 +312,6 @@ for y in range(0,height):
 if options.verbose:
     print("grid with answers is:\n"+grid.to_grid_string(False))
 
-# There sometimes seems to be a succession of bytes here in groups of
-# repeated groups of four, next - this function tests for the patterns
-# I've seen:
-
-def skippable_block_of_four(data,start_index):
-    if d[i] == 0x00 and d[i+1] == 0xff and d[i+2] == 0xff and d[i+3] == 0xff:
-        return True
-    elif d[i] == 0x00 and d[i+1] == 0x00 and d[i+2] == 0xff and d[i+3] == 0xff:
-        return True
-    elif d[i] == 0x00 and d[i+1] == 0x00 and d[i+2] == 0x00 and d[i+3] == 0x00:
-        return True
-    else:
-        return False
-
 skipped_blocks_of_four = 0
 while skippable_block_of_four(d,i):
     i += 4
@@ -204,119 +327,6 @@ if d[i] != 0x02:
 
 # Always just 16?
 i += 16
-
-def reduce_coordinate(x):
-    if x >= 0x80:
-        return x - 0x80
-    else:
-        return x
-
-def read_clue_start_coordinates(data,start_index):
-    # My assumption is that if the first byte is >= 0x80 then it's a
-    # list of coordinates terminated by a NUL, otherwise it's just two
-    # bytes with the coordinate:
-    start_coordinates = []
-    if data[start_index] >= 0x80:
-        i = start_index
-        while data[i] != 0:
-            x = reduce_coordinate(data[i])
-            y = reduce_coordinate(data[i+1])
-            start_coordinates.append( (x,y) )
-            i += 2
-        return (start_coordinates,i+1)
-    else:
-        x = reduce_coordinate(data[start_index])
-        y = reduce_coordinate(data[start_index+1])
-        start_coordinates.append( (x,y) )
-        return (start_coordinates,start_index+2)
-
-# A convenience class - we have one object of this class for all the
-# across clues and another object of this class for the down clues:
-
-class ListOfClues:
-    def __init__(self):
-        self.number_of_clues = None
-        self.label = None
-        self.clue_dictionary = {}
-        self.across = None
-        self.unknown_bytes = None
-    def ordered_list_of_clues(self):
-        keys = sorted(self.clue_dictionary.keys())
-        return list(map(lambda x: self.clue_dictionary[x], keys))
-    def real_number_of_clues(self):
-        return len(self.clue_dictionary)
-
-# Just to store a single clue:
-
-class IndependentClue:
-    def __init__(self):
-        self.number_string = None
-        self.text_including_enumeration = None
-        self.start_coordinates = None
-        self.across = None
-        self.all_clue_numbers = None
-    def tidied_text_including_enumeration(self):
-        t = re.sub('[\x00-\x1f]','',self.text_including_enumeration)
-        t = re.sub(' *\(',' (',t)
-        return t
-    def set_number(self,clue_number_string):
-        self.number_string = clue_number_string
-        if self.across == None:
-            raise Exception("Trying to call self.set_number() before self.across is set")
-        self.all_clue_numbers = list(map( lambda x: clue_number_string_to_duple(self.across,x), re.split('[,/]',clue_number_string)))
-
-def parse_list_of_clues(data,start_index):
-    result = ListOfClues()
-    i = start_index
-    # Read the label for this list of clues:
-    result.label, i = read_string(data,i)
-    if options.verbose:
-        print("clue set label is: "+result.label)
-    result.across = None
-    if re.search("(?ims)across",result.label):
-        result.across = True
-    elif re.search("(?ims)down",result.label):
-        result.across = False
-    else:
-        raise Exception("Couldn't find either /across/i or /down/i in label: '"+str(result.label)+"'")
-    # Skip some bytes:
-    result.unknown_bytes = data[i:i+3]
-    i += 3
-    if options.verbose:
-        print("  Before list of clues, got these unknown bytes:")
-        for b in result.unknown_bytes:
-            print("    "+str(b))
-    result.number_of_clues = data[i]
-    if options.verbose:
-        print("number of clues is: "+str(result.number_of_clues))
-    i += 1
-    clues_found = 0
-    while True:
-        if options.verbose:
-            print("--------------------------")
-        clue = IndependentClue()
-        clue.across = result.across
-        clue.start_coordinates, i = read_clue_start_coordinates(data,i)
-        if options.verbose:
-            for c in clue.start_coordinates:
-                print("A start at x: "+str(c[0])+", y: "+str(c[1]))
-        s, i = read_string(data,i)
-        clue.set_number(s)
-        if options.verbose:
-            print("clue number: "+clue.number_string)
-            print("all clue numbers: "+(", ".join(map(lambda x: str(x[0])+(x[1] and "A" or "D"), clue.all_clue_numbers))))
-        # Skip a NUL:
-        if data[i] != 0:
-            raise Exception("After clue number we expect a NUL to skip over")
-        i += 1
-        clue.text_including_enumeration, i = read_string(data,i)
-        if options.verbose:
-            print("clue text: "+clue.text_including_enumeration)
-        result.clue_dictionary[clue.all_clue_numbers[0][0]] = clue
-        clues_found += 1
-        if clues_found >= result.number_of_clues:
-            break
-    return result, i
 
 across_clues, i = parse_list_of_clues(d,i)
 
@@ -399,16 +409,6 @@ for across in (True,False):
                 expected_dictionary[n] = fake_clue
                 if options.verbose:
                     print("**** Added missing clue with index "+str(n)+" "+fake_clue.tidied_text_including_enumeration())
-
-# This function is for sorting clues before output, we want them to be
-# in the order the number appear in the grid, with across before down
-# if there's a choice:
-
-def keyfunc_clues(x):
-    across_for_sorting = 1
-    if x.across:
-        across_for_sorting = 0
-    return ( x.all_clue_numbers[0][0], across_for_sorting )
 
 # Output to something like the .PUZ format used by AcrossLite.  I only
 # care about loading this into xword, so I'm not bothering to
