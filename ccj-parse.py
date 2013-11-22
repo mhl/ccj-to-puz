@@ -18,6 +18,9 @@ import re
 from optparse import OptionParser
 import io
 import struct
+import unicodedata
+
+from commonccj import *
 
 parser = OptionParser()
 parser.add_option('-o', "--output", dest="output_filename",
@@ -43,12 +46,9 @@ if options.date:
         raise Exception("Unknown date format, must be YYYY-MM-DD")
     date_string = options.date
 
-from commonccj import *
-
 # Make sys.stdin binary:
 d = sys.stdin.buffer.read()
 
-import unicodedata
 def contains_control_characters(s):
     for c in s:
         if unicodedata.category(c) == 'Cc':
