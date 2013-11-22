@@ -164,6 +164,62 @@ def keyfunc_clues(x):
         across_for_sorting = 0
     return ( x.all_clue_numbers[0][0], across_for_sorting )
 
+def write_to_file(width,
+                  height,
+                  across_clues,
+                  down_clues,
+                  grid,
+                  copyright,
+                  output_filename):
+    f = io.FileIO(output_filename,'wb')
+    f.write(bytearray(0x2C))
+    dimensions_etc = bytearray(2)
+    dimensions_etc[0] = width
+    dimensions_etc[1] = height
+    f.write(dimensions_etc)
+    f.write(struct.pack("<h",across_clues.real_number_of_clues()+down_clues.real_number_of_clues()))
+    f.write(bytearray(4))
+    solutions = bytearray(width*height)
+    empty_grid = bytearray(width*height)
+    i = 0
+    for y in range(0,height):
+        for x in range(0,width):
+            c = grid.cells[y][x]
+            if c:
+                solutions[i] = ord(c.letter)
+                empty_grid[i] = ord('-')
+            else:
+                solutions[i] = ord('.')
+                empty_grid[i] = ord('.')
+            i += 1
+    f.write(solutions)
+    f.write(empty_grid)
+    nul = bytearray(1)
+    f.write(title.encode('UTF-8'))
+    f.write(nul)
+    f.write(author.encode('UTF-8'))
+    f.write(nul)
+    f.write(copyright.encode('UTF-8'))
+    f.write(nul)
+    all_clues = across_clues.ordered_list_of_clues() + down_clues.ordered_list_of_clues()
+    all_clues.sort(key=keyfunc_clues)
+    for c in all_clues:
+        number_string_tidied = re.sub('/',',',c.number_string)
+        number_string_tidied = number_string_tidied.lower()
+        clue_text = c.tidied_text_including_enumeration()
+        # We have to stick the number string at the beginning
+        # otherwise it won't be clear when the answers to clues cover
+        # several entries in the grid.
+        f.write(("["+number_string_tidied+"] ").encode('UTF-8'))
+        # Encode the clue text as UTF-8, because it's not defined what
+        # the character set should be anywhere that I've seen.  (xword
+        # currently assumes ISO-8859-1, but that doesn't strike me as
+        # a good enough reason in itself, since it's easily patched.)
+        f.write(clue_text.encode('UTF-8'))
+        f.write(nul)
+    f.write(nul)
+    f.close()
+
 # A convenience class - we have one object of this class for all the
 # across clues and another object of this class for the down clues:
 
@@ -418,51 +474,10 @@ if __name__ == "__main__":
     # can be found here: http://joshisanerd.com/puz/
 
     if options.output_filename:
-        f = io.FileIO(options.output_filename,'wb')
-        f.write(bytearray(0x2C))
-        dimensions_etc = bytearray(2)
-        dimensions_etc[0] = width
-        dimensions_etc[1] = height
-        f.write(dimensions_etc)
-        f.write(struct.pack("<h",across_clues.real_number_of_clues()+down_clues.real_number_of_clues()))
-        f.write(bytearray(4))
-        solutions = bytearray(width*height)
-        empty_grid = bytearray(width*height)
-        i = 0
-        for y in range(0,height):
-            for x in range(0,width):
-                c = grid.cells[y][x]
-                if c:
-                    solutions[i] = ord(c.letter)
-                    empty_grid[i] = ord('-')
-                else:
-                    solutions[i] = ord('.')
-                    empty_grid[i] = ord('.')
-                i += 1
-        f.write(solutions)
-        f.write(empty_grid)
-        nul = bytearray(1)
-        f.write(title.encode('UTF-8'))
-        f.write(nul)
-        f.write(author.encode('UTF-8'))
-        f.write(nul)
-        f.write(copyright.encode('UTF-8'))
-        f.write(nul)
-        all_clues = across_clues.ordered_list_of_clues() + down_clues.ordered_list_of_clues()
-        all_clues.sort(key=keyfunc_clues)
-        for c in all_clues:
-            number_string_tidied = re.sub('/',',',c.number_string)
-            number_string_tidied = number_string_tidied.lower()
-            clue_text = c.tidied_text_including_enumeration()
-            # We have to stick the number string at the beginning
-            # otherwise it won't be clear when the answers to clues cover
-            # several entries in the grid.
-            f.write(("["+number_string_tidied+"] ").encode('UTF-8'))
-            # Encode the clue text as UTF-8, because it's not defined what
-            # the character set should be anywhere that I've seen.  (xword
-            # currently assumes ISO-8859-1, but that doesn't strike me as
-            # a good enough reason in itself, since it's easily patched.)
-            f.write(clue_text.encode('UTF-8'))
-            f.write(nul)
-        f.write(nul)
-        f.close()
+        write_to_file(width,
+                      height,
+                      across_clues,
+                      down_clues,
+                      grid,
+                      copyright,
+                      options.output_filename)
