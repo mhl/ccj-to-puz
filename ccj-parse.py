@@ -1,4 +1,4 @@
-#!/usr/bin/python3.1
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # This script takes a .ccj file on standard input and can output the
