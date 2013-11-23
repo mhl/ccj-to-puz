@@ -103,13 +103,13 @@ def read_clue_start_coordinates(data, start_index):
         while byte_at(data, i) != 0:
             x = reduce_coordinate(byte_at(data, i))
             y = reduce_coordinate(byte_at(data, i + 1))
-            start_coordinates.append( (x, y) )
+            start_coordinates.append((x, y))
             i += 2
         return (start_coordinates, i + 1)
     else:
         x = reduce_coordinate(byte_at(data, start_index))
         y = reduce_coordinate(byte_at(data, start_index + 1))
-        start_coordinates.append( (x, y) )
+        start_coordinates.append((x, y))
         return (start_coordinates, start_index + 2)
 
 def parse_list_of_clues(data, start_index):
@@ -177,7 +177,7 @@ def keyfunc_clues(x):
     across_for_sorting = 1
     if x.across:
         across_for_sorting = 0
-    return ( x.all_clue_numbers[0][0], across_for_sorting )
+    return (x.all_clue_numbers[0][0], across_for_sorting)
 
 def coord_str(x, y):
     return "({0}, {1})".format(x, y)
