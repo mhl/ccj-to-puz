@@ -23,10 +23,7 @@ import unicodedata
 from commonccj import *
 
 def contains_control_characters(s):
-    for c in s:
-        if unicodedata.category(c) == 'Cc':
-            return True
-    return False
+    return any(unicodedata.category(c) == 'Cc' for c in s)
 
 # Not sure about character set issues here, but it seems that 0x03
 # turns on italic and 0x01 turns it off. In addition, there may be
