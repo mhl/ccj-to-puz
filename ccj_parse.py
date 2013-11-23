@@ -439,58 +439,63 @@ class ParsedCCJ:
                                   fake_clue.tidied_text_including_enumeration())
 
     def write_to_puz_file(self, output_filename):
-        f = io.FileIO(output_filename, 'wb')
-        f.write(bytearray(0x2C))
-        dimensions_etc = bytearray(2)
-        dimensions_etc[0] = self.width
-        dimensions_etc[1] = self.height
-        f.write(dimensions_etc)
-        f.write(struct.pack("<h",
-                            self.across_clues.real_number_of_clues() +
-                            self.down_clues.real_number_of_clues()))
-        f.write(bytearray(4))
-        solutions = bytearray(self.width*self.height)
-        empty_grid = bytearray(self.width*self.height)
-        i = 0
-        for y in range(0, self.height):
-            for x in range(0, self.width):
-                c = self.grid.cells[y][x]
-                if c:
-                    solutions[i] = ord(c.letter)
-                    empty_grid[i] = ord('-')
-                else:
-                    solutions[i] = ord('.')
-                    empty_grid[i] = ord('.')
-                i += 1
-        f.write(solutions)
-        f.write(empty_grid)
-        nul = bytearray(1)
-        f.write(self.title.encode('UTF-8'))
-        f.write(nul)
-        f.write(self.author.encode('UTF-8'))
-        f.write(nul)
-        f.write(self.copyright_message.encode('UTF-8'))
-        f.write(nul)
-        all_clues = self.across_clues.ordered_list_of_clues()
-        all_clues += self.down_clues.ordered_list_of_clues()
+        """Write the crossword in AcrossLite .puz format to output_filename
 
-        all_clues.sort(key=keyfunc_clues)
-        for c in all_clues:
-            number_string_tidied = re.sub(r'/', ',', c.number_string)
-            number_string_tidied = number_string_tidied.lower()
-            clue_text = c.tidied_text_including_enumeration()
-            # We have to stick the number string at the beginning
-            # otherwise it won't be clear when the answers to clues cover
-            # several entries in the grid.
-            f.write(("[" + number_string_tidied + "] ").encode('UTF-8'))
-            # Encode the clue text as UTF-8, because it's not defined what
-            # the character set should be anywhere that I've seen.  (xword
-            # currently assumes ISO-8859-1, but that doesn't strike me as
-            # a good enough reason in itself, since it's easily patched.)
-            f.write(clue_text.encode('UTF-8'))
+        Note that the version for the file format that this outputs
+        doesn't include checksums, so a strict loader will reject such
+        a file - it's fine in xword, though."""
+
+        with io.FileIO(output_filename, 'wb') as f:
+            f.write(bytearray(0x2C))
+            dimensions_etc = bytearray(2)
+            dimensions_etc[0] = self.width
+            dimensions_etc[1] = self.height
+            f.write(dimensions_etc)
+            f.write(struct.pack("<h",
+                                self.across_clues.real_number_of_clues() +
+                                self.down_clues.real_number_of_clues()))
+            f.write(bytearray(4))
+            solutions = bytearray(self.width*self.height)
+            empty_grid = bytearray(self.width*self.height)
+            i = 0
+            for y in range(0, self.height):
+                for x in range(0, self.width):
+                    c = self.grid.cells[y][x]
+                    if c:
+                        solutions[i] = ord(c.letter)
+                        empty_grid[i] = ord('-')
+                    else:
+                        solutions[i] = ord('.')
+                        empty_grid[i] = ord('.')
+                    i += 1
+            f.write(solutions)
+            f.write(empty_grid)
+            nul = bytearray(1)
+            f.write(self.title.encode('UTF-8'))
             f.write(nul)
-        f.write(nul)
-        f.close()
+            f.write(self.author.encode('UTF-8'))
+            f.write(nul)
+            f.write(self.copyright_message.encode('UTF-8'))
+            f.write(nul)
+            all_clues = self.across_clues.ordered_list_of_clues()
+            all_clues += self.down_clues.ordered_list_of_clues()
+
+            all_clues.sort(key=keyfunc_clues)
+            for c in all_clues:
+                number_string_tidied = re.sub(r'/', ',', c.number_string)
+                number_string_tidied = number_string_tidied.lower()
+                clue_text = c.tidied_text_including_enumeration()
+                # We have to stick the number string at the beginning
+                # otherwise it won't be clear when the answers to clues cover
+                # several entries in the grid.
+                f.write(("[" + number_string_tidied + "] ").encode('UTF-8'))
+                # Encode the clue text as UTF-8, because it's not defined what
+                # the character set should be anywhere that I've seen.  (xword
+                # currently assumes ISO-8859-1, but that doesn't strike me as
+                # a good enough reason in itself, since it's easily patched.)
+                f.write(clue_text.encode('UTF-8'))
+                f.write(nul)
+            f.write(nul)
 
 def ensure_sys_argv_is_decoded():
     if sys.version_info < (3, 0):
