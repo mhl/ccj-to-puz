@@ -1,43 +1,50 @@
-# A variety of helper classes useful to the CCJ parsing code in
-# ccj-parse.py.
+"""A variety of helper classes useful to the CCJ parsing code"""
 
 import re
 
-# If an across clue is labelled something like "12,3 Down,5", then you
-# can call this function (with in_across set to True) on each element
-# of that comma separated list and it will return (12,True), (3,False)
-# and (5,True) respectively.
+def clue_number_string_to_duple(in_across, clue_number_string):
+    """A function that parses a clue number
 
-def clue_number_string_to_duple(in_across,clue_number_string):
-    m = re.search('(?ims)(\d+) *(A|D)?',clue_number_string)
+    If an across clue is labelled something like "12,3 Down,5", then
+    you can call this function (with in_across set to True) on each
+    element of that comma separated list and it will return (12,True),
+    (3,False) and (5,True) respectively."""
+
+    m = re.search(r'(?ims)(\d+) *(A|D)?', clue_number_string)
     if m:
         across = in_across
         if m.group(2):
             across = (m.group(2).lower() == 'a')
-        n = int(m.group(1),10)
+        n = int(m.group(1), 10)
         return ( n, across )
     else:
-        raise Exception("Couldn't parse clue number string: '%s'" % (clue_number_string))
+        message = "Couldn't parse clue number string: '{0}'"
+        raise Exception(message.format(clue_number_string))
 
 class Cell:
-    def __init__(self,row,column):
+    """A class to represent a particular cell in a crossword grid"""
+    def __init__(self, row, column):
         self.letter = '+'
         self.row = row
         self.column = column
-    def set_letter(self,l):
+    def set_letter(self, l):
+        """A setter method to update what's in the cell"""
         self.letter = l
 
 class Grid:
-    def __init__(self,width,height):
+    """A class to represent all the cells in a crossword grid"""
+    def __init__(self, width, height):
         self.width = width
         self.height = height
-        self.cells = list()
-        for r in range(self.height):
-            row = list()
-            for c in range(self.width):
+        self.cells = []
+        for _ in range(self.height):
+            row = []
+            for _ in range(self.width):
                 row.append(None)
             self.cells.append(row)
-    def to_grid_string(self,empty):
+
+    def to_grid_string(self, empty):
+        """Output an ASCII-art representation of the grid"""
         result = ""
         for r in self.cells:
             row_string = ""
