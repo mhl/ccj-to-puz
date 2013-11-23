@@ -231,7 +231,7 @@ class ParsedCCJ:
         self.grid = None
         self.title = None
         self.author = None
-        self.copyright = None
+        self.copyright_message = None
         self.setter = None
         self.puzzle_number = None
 
@@ -240,7 +240,7 @@ class ParsedCCJ:
                       title,
                       author,
                       puzzle_number,
-                      copyright,
+                      copyright_message,
                       verbose=False):
 
         d = f.read()
@@ -393,9 +393,9 @@ class ParsedCCJ:
         if author:
             self.author = author
 
-        self.copyright = "© Unknown"
-        if copyright:
-            self.copyright = copyright
+        self.copyright_message = "© Unknown"
+        if copyright_message:
+            self.copyright_message = copyright_message
 
         # In the AcrossLite .PUZ format we need to make sure that there's one
         # "clue" for each clue number, even if it's just "See 6" for clues
@@ -469,7 +469,7 @@ class ParsedCCJ:
         f.write(nul)
         f.write(self.author.encode('UTF-8'))
         f.write(nul)
-        f.write(self.copyright.encode('UTF-8'))
+        f.write(self.copyright_message.encode('UTF-8'))
         f.write(nul)
         all_clues = self.across_clues.ordered_list_of_clues()
         all_clues += self.down_clues.ordered_list_of_clues()
@@ -512,7 +512,7 @@ if __name__ == "__main__":
                       help="specify the crossword author or setter")
     parser.add_option('-n', '--number', dest='puzzle_number',
                       help="specify the puzzle number")
-    parser.add_option('-c', '--copyright', dest='copyright',
+    parser.add_option('-c', '--copyright', dest='copyright_message',
                       help="specify the copyright message")
 
     ensure_sys_argv_is_decoded()
@@ -534,7 +534,7 @@ if __name__ == "__main__":
                          options.title,
                          options.author,
                          options.puzzle_number,
-                         options.copyright,
+                         options.copyright_message,
                          options.verbose)
 
     # Output to something like the .PUZ format used by AcrossLite.  I only
