@@ -355,7 +355,6 @@ class ParsedCCJ:
             self.author = author
 
         self.copyright = "© Unknown"
-        print("copyright is:", copyright)
         if copyright:
             self.copyright = copyright
 
