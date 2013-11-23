@@ -61,9 +61,9 @@ def byte_at(data, i):
 def read_string(data, start_index):
     """Decode a length-prefixed string from start_index in data"""
     length = byte_at(data, start_index)
-    bytes_for_string = data[(start_index+1):(start_index+length+1)]
+    bytes_for_string = data[(start_index + 1):(start_index + length + 1)]
     s = decode_bytes(bytes_for_string)
-    return (s, start_index+length+1)
+    return (s, start_index + length + 1)
 
 
 def skippable_block_of_four(data, start_index):
@@ -95,15 +95,15 @@ def read_clue_start_coordinates(data, start_index):
         i = start_index
         while byte_at(data, i) != 0:
             x = reduce_coordinate(byte_at(data, i))
-            y = reduce_coordinate(byte_at(data, i+1))
+            y = reduce_coordinate(byte_at(data, i + 1))
             start_coordinates.append( (x, y) )
             i += 2
-        return (start_coordinates, i+1)
+        return (start_coordinates, i + 1)
     else:
         x = reduce_coordinate(byte_at(data, start_index))
-        y = reduce_coordinate(byte_at(data, start_index+1))
+        y = reduce_coordinate(byte_at(data, start_index + 1))
         start_coordinates.append( (x, y) )
-        return (start_coordinates, start_index+2)
+        return (start_coordinates, start_index + 2)
 
 def parse_list_of_clues(data, start_index):
     result = ListOfClues()
@@ -111,24 +111,24 @@ def parse_list_of_clues(data, start_index):
     # Read the label for this list of clues:
     result.label, i = read_string(data, i)
     if options.verbose:
-        print("clue set label is: "+result.label)
+        print("clue set label is:", result.label)
     result.across = None
     if re.search(r'(?ims)across', result.label):
         result.across = True
     elif re.search(r'(?ims)down', result.label):
         result.across = False
     else:
-        raise Exception("Couldn't find either /across/i or /down/i in label: '"+str(result.label)+"'")
+        raise Exception("Couldn't find either /across/i or /down/i in label: '" + str(result.label) + "'")
     # Skip some bytes:
-    result.unknown_bytes = data[i:i+3]
+    result.unknown_bytes = data[i:(i + 3)]
     i += 3
     if options.verbose:
         print("  Before list of clues, got these unknown bytes:")
         for b in result.unknown_bytes:
-            print("    "+str(b))
+            print("    " + str(b))
     result.number_of_clues = byte_at(data, i)
     if options.verbose:
-        print("number of clues is: "+str(result.number_of_clues))
+        print("number of clues is: " + str(result.number_of_clues))
     i += 1
     clues_found = 0
     while True:
@@ -139,19 +139,19 @@ def parse_list_of_clues(data, start_index):
         clue.start_coordinates, i = read_clue_start_coordinates(data, i)
         if options.verbose:
             for c in clue.start_coordinates:
-                print("A start at x: "+str(c[0])+", y: "+str(c[1]))
+                print("A start at x: " + str(c[0]) + ", y: " + str(c[1]))
         s, i = read_string(data, i)
         clue.set_number(s)
         if options.verbose:
-            print("clue number: "+clue.number_string)
-            print("all clue numbers: "+(", ".join(map(lambda x: str(x[0])+(x[1] and "A" or "D"), clue.all_clue_numbers))))
+            print("clue number: " + clue.number_string)
+            print("all clue numbers: " + (", ".join(map(lambda x: str(x[0]) + (x[1] and "A" or "D"), clue.all_clue_numbers))))
         # Skip a NUL:
         if byte_at(data, i) != 0:
             raise Exception("After clue number we expect a NUL to skip over")
         i += 1
         clue.text_including_enumeration, i = read_string(data, i)
         if options.verbose:
-            print("clue text: "+clue.text_including_enumeration)
+            print("clue text:", clue.text_including_enumeration)
         result.clue_dictionary[clue.all_clue_numbers[0][0]] = clue
         clues_found += 1
         if clues_found >= result.number_of_clues:
@@ -228,14 +228,14 @@ class ParsedCCJ:
         while byte_at(d, i) != 0:
             s, i = read_string(d, i)
             if verbose:
-                print("got button string: "+s)
+                print("got button string:", s)
 
         # Then the congratulations message, I think:
         i += 1
         s, i = read_string(d, i)
 
         if verbose:
-            print("got congratulations message: "+s)
+            print("got congratulations message:", s)
 
         # Skip another byte; 0x02 in the Independent it seems, but 0x00 in the
         # Herald puzzle I tried.
@@ -264,11 +264,11 @@ class ParsedCCJ:
                 elif byte_at(d, i) == 0x23:
                     pass
                 else:
-                    raise Exception("Unknown value: "+str(byte_at(d, i))+" at ("+str(x)+","+str(y)+")")
+                    raise Exception("Unknown value: " + str(byte_at(d, i)) + " at (" + str(x) + "," + str(y) + ")")
                 i += 1
 
         if verbose:
-            print("grid is:\n"+self.grid.to_grid_string(True))
+            print("grid is:\n" + self.grid.to_grid_string(True))
 
         # Next there's a grid structure the purpose of which I don't
         # understand:
@@ -284,7 +284,7 @@ class ParsedCCJ:
                 else:
                     truncated = byte_at(d, i) % 10
                     if verbose:
-                        print("Warning, truncating "+str(byte_at(d, i))+" to "+str(truncated)+" at ("+str(x)+","+str(y)+")")
+                        print("Warning, truncating " + str(byte_at(d, i)) + " to " + str(truncated) + " at (" + str(x) + "," + str(y) + ")")
                     grid_unknown_purpose.cells[y][x].set_letter(str(truncated))
                 i += 1
 
@@ -295,7 +295,7 @@ class ParsedCCJ:
         i += 1
 
         if verbose:
-            print("grid_unknown_purpose is:\n"+grid_unknown_purpose.to_grid_string(False))
+            print("grid_unknown_purpose is:\n" + grid_unknown_purpose.to_grid_string(False))
 
         # Now there's the grid with the answers:
         for y in range(0, self.height):
@@ -305,7 +305,7 @@ class ParsedCCJ:
                     i += 1
 
         if verbose:
-            print("grid with answers is:\n"+self.grid.to_grid_string(False))
+            print("grid with answers is:\n" + self.grid.to_grid_string(False))
 
         skipped_blocks_of_four = 0
         while skippable_block_of_four(d, i):
@@ -314,11 +314,11 @@ class ParsedCCJ:
 
         if skipped_blocks_of_four > 0:
             if verbose:
-                print("Skipped over "+str(skipped_blocks_of_four)+" blocks of 0x00 0xff 0xff 0xff")
+                print("Skipped over " + str(skipped_blocks_of_four) + " blocks of 0x00 0xff 0xff 0xff")
 
         # I expect the next one to be 0x02:
         if byte_at(d, i) != 0x02:
-            raise Exception("Expect the first of the block of 16 always to be 0x02, in fact: "+str(byte_at(d, i)))
+            raise Exception("Expect the first of the block of 16 always to be 0x02, in fact: " + str(byte_at(d, i)))
 
         # Always just 16?
         i += 16
@@ -345,14 +345,14 @@ class ParsedCCJ:
             self.title = title
 
         if self.setter and self.puzzle_number:
-            self.title += " "+self.puzzle_number+" / "+self.setter
+            self.title += " " + self.puzzle_number + " / " + self.setter
         elif self.setter:
-            self.title += " / "+self.setter
+            self.title += " / " + self.setter
         elif self.puzzle_number:
-            self.title += " "+self.puzzle_number
+            self.title += " " + self.puzzle_number
 
         if date_string:
-            self.title += " ("+date_string+")"
+            self.title += " (" + date_string + ")"
 
         self.author = "Unknown Setter"
         if author:
@@ -385,7 +385,7 @@ class ParsedCCJ:
                     n = l[0]
                     a = l[1]
                     expected_dictionary = None
-                    clue_string = "See "+str(original_clue_duple[0])
+                    clue_string = "See " + str(original_clue_duple[0])
                     if a:
                         expected_dictionary = self.across_clues.clue_dictionary
                     else:
@@ -400,7 +400,7 @@ class ParsedCCJ:
                         fake_clue.set_number(str(n))
                         expected_dictionary[n] = fake_clue
                         if verbose:
-                            print("**** Added missing clue with index "+str(n)+" "+fake_clue.tidied_text_including_enumeration())
+                            print("**** Added missing clue with index " + str(n) + " " + fake_clue.tidied_text_including_enumeration())
 
     def write_to_puz_file(self, output_filename):
         f = io.FileIO(output_filename, 'wb')
@@ -409,7 +409,7 @@ class ParsedCCJ:
         dimensions_etc[0] = self.width
         dimensions_etc[1] = self.height
         f.write(dimensions_etc)
-        f.write(struct.pack("<h", self.across_clues.real_number_of_clues()+self.down_clues.real_number_of_clues()))
+        f.write(struct.pack("<h", self.across_clues.real_number_of_clues() + self.down_clues.real_number_of_clues()))
         f.write(bytearray(4))
         solutions = bytearray(self.width*self.height)
         empty_grid = bytearray(self.width*self.height)
@@ -442,7 +442,7 @@ class ParsedCCJ:
             # We have to stick the number string at the beginning
             # otherwise it won't be clear when the answers to clues cover
             # several entries in the grid.
-            f.write(("["+number_string_tidied+"] ").encode('UTF-8'))
+            f.write(("[" + number_string_tidied + "] ").encode('UTF-8'))
             # Encode the clue text as UTF-8, because it's not defined what
             # the character set should be anywhere that I've seen.  (xword
             # currently assumes ISO-8859-1, but that doesn't strike me as
