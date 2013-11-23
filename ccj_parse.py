@@ -42,8 +42,9 @@ def decode_bytes(bytes_to_decode):
     that doesn't succeed, try Windows 1252 and then ISO-8859-1, giving
     up if there are control characters left after decoding and
     replacing newlines with spaces."""
-    bytes_to_decode = bytearray(filter(lambda c: c not in (0x01, 0x03),
-                                       bytearray(bytes_to_decode)))
+    bytes_to_decode = bytearray(c for c in bytearray(bytes_to_decode)
+                                if c not in (0x01, 0x03))
+
     for encoding in ('utf_8', 'latin_1', 'cp1252'):
         try:
             s = bytes_to_decode.decode(encoding)
@@ -153,8 +154,8 @@ def parse_list_of_clues(data, start_index):
         if options.verbose:
             print("clue number: " + clue.number_string)
             print("all clue numbers:",
-                  ", ".join(map(lambda x: str(x[0]) + (x[1] and "A" or "D"),
-                                clue.all_clue_numbers)))
+                  ", ".join(str(x[0]) + (x[1] and "A" or "D")
+                            for x in clue.all_clue_numbers))
         # Skip a NUL:
         if byte_at(data, i) != 0:
             raise Exception("After clue number we expect a NUL to skip over")
@@ -193,7 +194,7 @@ class ListOfClues:
         self.unknown_bytes = None
     def ordered_list_of_clues(self):
         keys = sorted(self.clue_dictionary.keys())
-        return list(map(lambda x: self.clue_dictionary[x], keys))
+        return [self.clue_dictionary[x] for x in keys]
     def real_number_of_clues(self):
         return len(self.clue_dictionary)
 
@@ -215,9 +216,10 @@ class IndependentClue:
         if self.across == None:
             msg = "Trying to call self.set_number() before self.across is set"
             raise Exception(msg)
-        self.all_clue_numbers = list(
-            map(lambda x: clue_number_string_to_duple(self.across, x),
-                re.split(r'[,/]', clue_number_string)))
+        self.all_clue_numbers = [clue_number_string_to_duple(self.across, x)
+                                 for x in
+                                 re.split(r'[,/]', clue_number_string)]
+
 
 class ParsedCCJ:
 
