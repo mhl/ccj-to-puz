@@ -23,16 +23,19 @@ import unicodedata
 from commonccj import *
 
 def contains_control_characters(s):
+    """Returns True if any control character is in s, otherwise False"""
     return any(unicodedata.category(c) == 'Cc' for c in s)
 
-# Not sure about character set issues here, but it seems that 0x03
-# turns on italic and 0x01 turns it off. In addition, there may be
-# several random 0x01 bytes before the enumeration.  We remove any
-# 0x01 or 0x03 bytes first.  Then try UTF-8 decoding - if that doesn't
-# succeed, try Windows 1252 and ISO-8859-1, giving up if there are
-# control characters left after decoding and replacing newlines with
-# spaces.
 def decode_bytes(b):
+    """Try to decode bytes (in an unknown encoding) into a string
+
+    I'm not sure about character set issues here, but it seems that
+    0x03 turns on italic and 0x01 turns it off. In addition, there may
+    be several random 0x01 bytes before the enumeration.  So, we
+    remove any 0x01 or 0x03 bytes first.  Then try UTF-8 decoding - if
+    that doesn't succeed, try Windows 1252 and then ISO-8859-1, giving
+    up if there are control characters left after decoding and
+    replacing newlines with spaces."""
     bytes_to_decode = bytearray(filter(lambda c: c not in (0x01, 0x03),
                                        bytearray(b)))
     for encoding in ('utf_8', 'latin_1', 'cp1252'):
@@ -46,22 +49,29 @@ def decode_bytes(b):
     raise Exception("Couldn't guess the character set.")
 
 def byte_at(data, i):
+    """Return integer value of the byte at index i of data
+
+    This is designed to work on a str (in Python 2) or a bytes (in
+    Python 3)"""
     if isinstance(data, str):
         return ord(data[i])
     else:
         return int(data[i])
 
 def read_string(data,start_index):
+    """Decode a length-prefixed string from start_index in data"""
     length = byte_at(data, start_index)
     bytes_for_string = data[(start_index+1):(start_index+length+1)]
     s = decode_bytes(bytes_for_string)
     return (s,start_index+length+1)
 
-# There sometimes seems to be a succession of bytes here in groups of
-# repeated groups of four, next - this function tests for the patterns
-# I've seen:
 
 def skippable_block_of_four(data,start_index):
+    """Detect if the 4 bytes at start_index in data are ignorable
+
+    There sometimes seems to be a succession of bytes here in groups
+    of repeated groups of four, next - this function tests for the
+    patterns I've seen."""
     block = bytearray(data[start_index:start_index + 4])
     skippable_blocks = [[0x00, 0xff, 0xff, 0xff],
                         [0x00, 0x00, 0xff, 0xff],
@@ -69,12 +79,14 @@ def skippable_block_of_four(data,start_index):
     return block in (bytearray(l) for l in skippable_blocks)
 
 def reduce_coordinate(x):
+    """Coordinates sometimes seem to have 80 added to them"""
     if x >= 0x80:
         return x - 0x80
     else:
         return x
 
 def read_clue_start_coordinates(data,start_index):
+    """Extract the start coordinates for an answer"""
     # My assumption is that if the first byte is >= 0x80 then it's a
     # list of coordinates terminated by a NUL, otherwise it's just two
     # bytes with the coordinate:
