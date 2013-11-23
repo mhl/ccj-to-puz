@@ -143,7 +143,7 @@ def parse_list_of_clues(data, start_index):
     while True:
         if options.verbose:
             print("--------------------------")
-        clue = IndependentClue()
+        clue = ParsedClue()
         clue.across = result.across
         clue.start_coordinates, i = read_clue_start_coordinates(data, i)
         if options.verbose:
@@ -169,38 +169,40 @@ def parse_list_of_clues(data, start_index):
             break
     return result, i
 
-# This function is for sorting clues before output, we want them to be
-# in the order the number appear in the grid, with across before down
-# if there's a choice:
-
 def keyfunc_clues(x):
-    across_for_sorting = 1
-    if x.across:
-        across_for_sorting = 0
-    return (x.all_clue_numbers[0][0], across_for_sorting)
+    """A key function for sorting clues before output"""
+    # We want clues to be in the order the number appear in the grid,
+    # with across before down if there's a choice:
+    return (x.all_clue_numbers[0][0], 0 if x.across else 1)
 
 def coord_str(x, y):
+    """Return a string representation of x and y"""
     return "({0}, {1})".format(x, y)
 
-# A convenience class - we have one object of this class for all the
-# across clues and another object of this class for the down clues:
 
 class ListOfClues:
+    """A class for grouping clues
+
+    Typically there's one instance of this to hold the across clues,
+    and one for the down clues."""
+
     def __init__(self):
         self.number_of_clues = None
         self.label = None
         self.clue_dictionary = {}
         self.across = None
         self.unknown_bytes = None
+
     def ordered_list_of_clues(self):
         keys = sorted(self.clue_dictionary.keys())
         return [self.clue_dictionary[x] for x in keys]
+
     def real_number_of_clues(self):
         return len(self.clue_dictionary)
 
-# Just to store a single clue:
 
-class IndependentClue:
+class ParsedClue:
+    """A class for storing data about a parsed clue"""
     def __init__(self):
         self.number_string = None
         self.text_including_enumeration = None
@@ -429,7 +431,7 @@ class ParsedCCJ:
                         clue_string += a and " across" or " down"
                     ekeys = list(expected_dictionary.keys())
                     if not n in ekeys:
-                        fake_clue = IndependentClue()
+                        fake_clue = ParsedClue()
                         fake_clue.across = a
                         fake_clue.text_including_enumeration = clue_string
                         fake_clue.set_number(str(n))
