@@ -246,7 +246,7 @@ class ParsedCCJ:
         for y in range(0,self.height):
             for x in range(0,self.width):
                 # Lights seem to be indicated by: '?' (or 'M' very occasionally)
-                if byte_at(d, i) == 0x3f or byte_at(d, i) == 0x4d:
+                if byte_at(d, i) in (0x3f, 0x4d):
                     self.grid.cells[y][x] = Cell(y,x)
                 # Blocked-out squares seem to be always '#'
                 elif byte_at(d, i) == 0x23:
