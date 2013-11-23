@@ -67,11 +67,11 @@ def read_string(data,start_index):
 # I've seen:
 
 def skippable_block_of_four(data,start_index):
-    if d[i] == 0x00 and d[i+1] == 0xff and d[i+2] == 0xff and d[i+3] == 0xff:
+    if data[start_index] == 0x00 and data[start_index+1] == 0xff and data[start_index+2] == 0xff and data[start_index+3] == 0xff:
         return True
-    elif d[i] == 0x00 and d[i+1] == 0x00 and d[i+2] == 0xff and d[i+3] == 0xff:
+    elif data[start_index] == 0x00 and data[start_index+1] == 0x00 and data[start_index+2] == 0xff and data[start_index+3] == 0xff:
         return True
-    elif d[i] == 0x00 and d[i+1] == 0x00 and d[i+2] == 0x00 and d[i+3] == 0x00:
+    elif data[start_index] == 0x00 and data[start_index+1] == 0x00 and data[start_index+2] == 0x00 and data[start_index+3] == 0x00:
         return True
     else:
         return False
