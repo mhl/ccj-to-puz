@@ -26,7 +26,7 @@ import io
 import struct
 import unicodedata
 
-from commonccj import *
+from commonccj import Cell, Grid, clue_number_string_to_duple
 
 def contains_control_characters(s):
     """Returns True if any control character is in s, otherwise False"""
