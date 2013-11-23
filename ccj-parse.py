@@ -40,7 +40,7 @@ def decode_bytes(b):
             s = bytes_to_decode.decode(encoding)
         except UnicodeDecodeError:
             continue
-        s = re.sub('\s+', ' ', s)
+        s = re.sub(r'\s+', ' ', s)
         if not contains_control_characters(s):
             return s
     raise Exception("Couldn't guess the character set.")
@@ -101,9 +101,9 @@ def parse_list_of_clues(data,start_index):
     if options.verbose:
         print("clue set label is: "+result.label)
     result.across = None
-    if re.search("(?ims)across",result.label):
+    if re.search(r'(?ims)across',result.label):
         result.across = True
-    elif re.search("(?ims)down",result.label):
+    elif re.search(r'(?ims)down',result.label):
         result.across = False
     else:
         raise Exception("Couldn't find either /across/i or /down/i in label: '"+str(result.label)+"'")
@@ -182,14 +182,14 @@ class IndependentClue:
         self.across = None
         self.all_clue_numbers = None
     def tidied_text_including_enumeration(self):
-        t = re.sub('[\x00-\x1f]','',self.text_including_enumeration)
-        t = re.sub(' *\(',' (',t)
+        t = re.sub(r'[\x00-\x1f]','',self.text_including_enumeration)
+        t = re.sub(r' *\(',' (',t)
         return t
     def set_number(self,clue_number_string):
         self.number_string = clue_number_string
         if self.across == None:
             raise Exception("Trying to call self.set_number() before self.across is set")
-        self.all_clue_numbers = list(map( lambda x: clue_number_string_to_duple(self.across,x), re.split('[,/]',clue_number_string)))
+        self.all_clue_numbers = list(map( lambda x: clue_number_string_to_duple(self.across,x), re.split(r'[,/]',clue_number_string)))
 
 class ParsedCCJ:
 
@@ -318,7 +318,7 @@ class ParsedCCJ:
 
         self.down_clues, i = parse_list_of_clues(d,i)
 
-        m = re.search('^(.*)-([0-9]+)',self.across_clues.label)
+        m = re.search(r'^(.*)-([0-9]+)',self.across_clues.label)
         if m:
             self.setter = m.group(1)
             self.puzzle_number = m.group(2)
@@ -424,7 +424,7 @@ class ParsedCCJ:
         all_clues = self.across_clues.ordered_list_of_clues() + self.down_clues.ordered_list_of_clues()
         all_clues.sort(key=keyfunc_clues)
         for c in all_clues:
-            number_string_tidied = re.sub('/',',',c.number_string)
+            number_string_tidied = re.sub(r'/',',',c.number_string)
             number_string_tidied = number_string_tidied.lower()
             clue_text = c.tidied_text_including_enumeration()
             # We have to stick the number string at the beginning
@@ -470,7 +470,7 @@ if __name__ == "__main__":
 
     date_string = None
     if options.date:
-        if not re.search("^\d{4}-\d{2}-\d{2}",options.date):
+        if not re.search(r'^\d{4}-\d{2}-\d{2}',options.date):
             raise Exception("Unknown date format, must be YYYY-MM-DD")
         date_string = options.date
 
