@@ -33,25 +33,17 @@ def contains_control_characters(s):
 # control characters left after decoding and replacing newlines with
 # spaces.
 def decode_bytes(b):
-    b = bytes(filter(lambda c: (c != 0x01) and (c != 0x03), b))
-    try:
-        s = b.decode('utf_8')
-        return s
-    except UnicodeDecodeError:
-        # Try ISO-8859-1 first, then Windows 1252 if
-        # there are unprintable characters in the
-        # decoded version.
-        s = b.decode('latin_1')
+    bytes_to_decode = bytearray(filter(lambda c: c not in (0x01, 0x03),
+                                       bytearray(b)))
+    for encoding in ('utf_8', 'latin_1', 'cp1252'):
+        try:
+            s = bytes_to_decode.decode(encoding)
+        except UnicodeDecodeError:
+            continue
         s = re.sub('\s+', ' ', s)
-        print("string (after latin_1) now looks like:", repr(s))
         if not contains_control_characters(s):
             return s
-        s = b.decode('cp1252')
-        s = re.sub('\s+', ' ', s)
-        print("string (after cp1252) now looks like:", repr(s))
-        if not contains_control_characters(s):
-            return s
-        raise Exception("Couldn't guess the character set.")
+    raise Exception("Couldn't guess the character set.")
 
 def byte_at(data, i):
     if isinstance(data, str):
