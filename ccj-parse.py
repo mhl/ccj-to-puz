@@ -58,15 +58,15 @@ def byte_at(data, i):
     else:
         return int(data[i])
 
-def read_string(data,start_index):
+def read_string(data, start_index):
     """Decode a length-prefixed string from start_index in data"""
     length = byte_at(data, start_index)
     bytes_for_string = data[(start_index+1):(start_index+length+1)]
     s = decode_bytes(bytes_for_string)
-    return (s,start_index+length+1)
+    return (s, start_index+length+1)
 
 
-def skippable_block_of_four(data,start_index):
+def skippable_block_of_four(data, start_index):
     """Detect if the 4 bytes at start_index in data are ignorable
 
     There sometimes seems to be a succession of bytes here in groups
@@ -85,7 +85,7 @@ def reduce_coordinate(x):
     else:
         return x
 
-def read_clue_start_coordinates(data,start_index):
+def read_clue_start_coordinates(data, start_index):
     """Extract the start coordinates for an answer"""
     # My assumption is that if the first byte is >= 0x80 then it's a
     # list of coordinates terminated by a NUL, otherwise it's just two
@@ -96,26 +96,26 @@ def read_clue_start_coordinates(data,start_index):
         while byte_at(data, i) != 0:
             x = reduce_coordinate(byte_at(data, i))
             y = reduce_coordinate(byte_at(data, i+1))
-            start_coordinates.append( (x,y) )
+            start_coordinates.append( (x, y) )
             i += 2
-        return (start_coordinates,i+1)
+        return (start_coordinates, i+1)
     else:
         x = reduce_coordinate(byte_at(data, start_index))
         y = reduce_coordinate(byte_at(data, start_index+1))
-        start_coordinates.append( (x,y) )
-        return (start_coordinates,start_index+2)
+        start_coordinates.append( (x, y) )
+        return (start_coordinates, start_index+2)
 
-def parse_list_of_clues(data,start_index):
+def parse_list_of_clues(data, start_index):
     result = ListOfClues()
     i = start_index
     # Read the label for this list of clues:
-    result.label, i = read_string(data,i)
+    result.label, i = read_string(data, i)
     if options.verbose:
         print("clue set label is: "+result.label)
     result.across = None
-    if re.search(r'(?ims)across',result.label):
+    if re.search(r'(?ims)across', result.label):
         result.across = True
-    elif re.search(r'(?ims)down',result.label):
+    elif re.search(r'(?ims)down', result.label):
         result.across = False
     else:
         raise Exception("Couldn't find either /across/i or /down/i in label: '"+str(result.label)+"'")
@@ -136,11 +136,11 @@ def parse_list_of_clues(data,start_index):
             print("--------------------------")
         clue = IndependentClue()
         clue.across = result.across
-        clue.start_coordinates, i = read_clue_start_coordinates(data,i)
+        clue.start_coordinates, i = read_clue_start_coordinates(data, i)
         if options.verbose:
             for c in clue.start_coordinates:
                 print("A start at x: "+str(c[0])+", y: "+str(c[1]))
-        s, i = read_string(data,i)
+        s, i = read_string(data, i)
         clue.set_number(s)
         if options.verbose:
             print("clue number: "+clue.number_string)
@@ -149,7 +149,7 @@ def parse_list_of_clues(data,start_index):
         if byte_at(data, i) != 0:
             raise Exception("After clue number we expect a NUL to skip over")
         i += 1
-        clue.text_including_enumeration, i = read_string(data,i)
+        clue.text_including_enumeration, i = read_string(data, i)
         if options.verbose:
             print("clue text: "+clue.text_including_enumeration)
         result.clue_dictionary[clue.all_clue_numbers[0][0]] = clue
@@ -194,14 +194,14 @@ class IndependentClue:
         self.across = None
         self.all_clue_numbers = None
     def tidied_text_including_enumeration(self):
-        t = re.sub(r'[\x00-\x1f]','',self.text_including_enumeration)
-        t = re.sub(r' *\(',' (',t)
+        t = re.sub(r'[\x00-\x1f]', '', self.text_including_enumeration)
+        t = re.sub(r' *\(', ' (', t)
         return t
-    def set_number(self,clue_number_string):
+    def set_number(self, clue_number_string):
         self.number_string = clue_number_string
         if self.across == None:
             raise Exception("Trying to call self.set_number() before self.across is set")
-        self.all_clue_numbers = list(map( lambda x: clue_number_string_to_duple(self.across,x), re.split(r'[,/]',clue_number_string)))
+        self.all_clue_numbers = list(map( lambda x: clue_number_string_to_duple(self.across, x), re.split(r'[,/]', clue_number_string)))
 
 class ParsedCCJ:
 
@@ -226,13 +226,13 @@ class ParsedCCJ:
 
         # I think these must be the list of buttons on the left:
         while byte_at(d, i) != 0:
-            s, i = read_string(d,i)
+            s, i = read_string(d, i)
             if verbose:
                 print("got button string: "+s)
 
         # Then the congratulations message, I think:
         i += 1
-        s, i = read_string(d,i)
+        s, i = read_string(d, i)
 
         if verbose:
             print("got congratulations message: "+s)
@@ -248,18 +248,18 @@ class ParsedCCJ:
         self.height = byte_at(d, i)
         i += 1
 
-        self.grid = Grid(self.width,self.height)
+        self.grid = Grid(self.width, self.height)
 
         # Now skip over everything until we think we see the grid, since I've
         # no idea what it's meant to mean:
         while byte_at(d, i) != 0x3f and byte_at(d, i) != 0x23:
             i += 1
 
-        for y in range(0,self.height):
-            for x in range(0,self.width):
+        for y in range(0, self.height):
+            for x in range(0, self.width):
                 # Lights seem to be indicated by: '?' (or 'M' very occasionally)
                 if byte_at(d, i) in (0x3f, 0x4d):
-                    self.grid.cells[y][x] = Cell(y,x)
+                    self.grid.cells[y][x] = Cell(y, x)
                 # Blocked-out squares seem to be always '#'
                 elif byte_at(d, i) == 0x23:
                     pass
@@ -272,11 +272,11 @@ class ParsedCCJ:
 
         # Next there's a grid structure the purpose of which I don't
         # understand:
-        grid_unknown_purpose = Grid(self.width,self.height)
+        grid_unknown_purpose = Grid(self.width, self.height)
 
-        for y in range(0,self.height):
-            for x in range(0,self.width):
-                grid_unknown_purpose.cells[y][x] = Cell(y,x)
+        for y in range(0, self.height):
+            for x in range(0, self.width):
+                grid_unknown_purpose.cells[y][x] = Cell(y, x)
                 if byte_at(d, i) == 0:
                     grid_unknown_purpose.cells[y][x].set_letter(' ')
                 elif byte_at(d, i) < 10:
@@ -298,8 +298,8 @@ class ParsedCCJ:
             print("grid_unknown_purpose is:\n"+grid_unknown_purpose.to_grid_string(False))
 
         # Now there's the grid with the answers:
-        for y in range(0,self.height):
-            for x in range(0,self.width):
+        for y in range(0, self.height):
+            for x in range(0, self.width):
                 if self.grid.cells[y][x]:
                     self.grid.cells[y][x].set_letter(chr(byte_at(d, i)))
                     i += 1
@@ -308,7 +308,7 @@ class ParsedCCJ:
             print("grid with answers is:\n"+self.grid.to_grid_string(False))
 
         skipped_blocks_of_four = 0
-        while skippable_block_of_four(d,i):
+        while skippable_block_of_four(d, i):
             i += 4
             skipped_blocks_of_four += 1
 
@@ -323,14 +323,14 @@ class ParsedCCJ:
         # Always just 16?
         i += 16
 
-        self.across_clues, i = parse_list_of_clues(d,i)
+        self.across_clues, i = parse_list_of_clues(d, i)
 
         if verbose:
             print("Now do down clues:")
 
-        self.down_clues, i = parse_list_of_clues(d,i)
+        self.down_clues, i = parse_list_of_clues(d, i)
 
-        m = re.search(r'^(.*)-([0-9]+)',self.across_clues.label)
+        m = re.search(r'^(.*)-([0-9]+)', self.across_clues.label)
         if m:
             self.setter = m.group(1)
             self.puzzle_number = m.group(2)
@@ -370,7 +370,7 @@ class ParsedCCJ:
         # something for every clue.  (So we don't miss the "See 6" type of
         # clue.)
 
-        for across in (True,False):
+        for across in (True, False):
             clue_dictionary = None
             if across:
                 clue_dictionary = self.across_clues.clue_dictionary
@@ -403,19 +403,19 @@ class ParsedCCJ:
                             print("**** Added missing clue with index "+str(n)+" "+fake_clue.tidied_text_including_enumeration())
 
     def write_to_puz_file(self, output_filename):
-        f = io.FileIO(output_filename,'wb')
+        f = io.FileIO(output_filename, 'wb')
         f.write(bytearray(0x2C))
         dimensions_etc = bytearray(2)
         dimensions_etc[0] = self.width
         dimensions_etc[1] = self.height
         f.write(dimensions_etc)
-        f.write(struct.pack("<h",self.across_clues.real_number_of_clues()+self.down_clues.real_number_of_clues()))
+        f.write(struct.pack("<h", self.across_clues.real_number_of_clues()+self.down_clues.real_number_of_clues()))
         f.write(bytearray(4))
         solutions = bytearray(self.width*self.height)
         empty_grid = bytearray(self.width*self.height)
         i = 0
-        for y in range(0,self.height):
-            for x in range(0,self.width):
+        for y in range(0, self.height):
+            for x in range(0, self.width):
                 c = self.grid.cells[y][x]
                 if c:
                     solutions[i] = ord(c.letter)
@@ -436,7 +436,7 @@ class ParsedCCJ:
         all_clues = self.across_clues.ordered_list_of_clues() + self.down_clues.ordered_list_of_clues()
         all_clues.sort(key=keyfunc_clues)
         for c in all_clues:
-            number_string_tidied = re.sub(r'/',',',c.number_string)
+            number_string_tidied = re.sub(r'/', ',', c.number_string)
             number_string_tidied = number_string_tidied.lower()
             clue_text = c.tidied_text_including_enumeration()
             # We have to stick the number string at the beginning
@@ -452,6 +452,10 @@ class ParsedCCJ:
         f.write(nul)
         f.close()
 
+def ensure_sys_argv_is_decoded():
+    if sys.version_info < (3, 0):
+        for i, a in enumerate(sys.argv):
+            sys.argv[i] = a.decode('UTF-8')
 
 if __name__ == "__main__":
 
@@ -471,10 +475,7 @@ if __name__ == "__main__":
     parser.add_option('-c', '--copyright', dest='copyright',
                       help="specify the copyright message")
 
-    if sys.version_info < (3, 0):
-        for i, a in enumerate(sys.argv):
-            sys.argv[i] = a.decode('UTF-8')
-
+    ensure_sys_argv_is_decoded()
     (options, args) = parser.parse_args()
 
     if len(args) > 0:
@@ -482,7 +483,7 @@ if __name__ == "__main__":
 
     date_string = None
     if options.date:
-        if not re.search(r'^\d{4}-\d{2}-\d{2}',options.date):
+        if not re.search(r'^\d{4}-\d{2}-\d{2}', options.date):
             raise Exception("Unknown date format, must be YYYY-MM-DD")
         date_string = options.date
 
