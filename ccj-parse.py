@@ -73,14 +73,11 @@ def read_string(data,start_index):
 # I've seen:
 
 def skippable_block_of_four(data,start_index):
-    if byte_at(data, start_index) == 0x00 and byte_at(data, start_index+1) == 0xff and byte_at(data, start_index+2) == 0xff and byte_at(data, start_index+3) == 0xff:
-        return True
-    elif byte_at(data, start_index) == 0x00 and byte_at(data, start_index+1) == 0x00 and byte_at(data, start_index+2) == 0xff and byte_at(data, start_index+3) == 0xff:
-        return True
-    elif byte_at(data, start_index) == 0x00 and byte_at(data, start_index+1) == 0x00 and byte_at(data, start_index+2) == 0x00 and byte_at(data, start_index+3) == 0x00:
-        return True
-    else:
-        return False
+    block = bytearray(data[start_index:start_index + 4])
+    skippable_blocks = [[0x00, 0xff, 0xff, 0xff],
+                        [0x00, 0x00, 0xff, 0xff],
+                        [0x00, 0x00, 0x00, 0x00]]
+    return block in (bytearray(l) for l in skippable_blocks)
 
 def reduce_coordinate(x):
     if x >= 0x80:
