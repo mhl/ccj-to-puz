@@ -1,17 +1,23 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# This script takes a .ccj file on standard input and can output the
-# crossword in something like the AcrossLite .puz binary format
-# suitable for loading into xword. [1]  Use --help or -h for usage
-# information.
-#
-#  [1] apt-get install xword
-#
-# You need the Debian version 1.04 of xword.
-#
-# Note that this script was written with guesswork based on looking at
-# example CCJ files.
+"""This module and script provides functionality for parsing CCJ crosswords
+
+You can use the CCJParser class to parse CCJ files and write it out in
+the AcrossLife .puz binary format.
+
+Alternatively you can use this as a script, taking a .ccj file on
+standard output, and it convert it to AcrossLite .puz format.
+
+The output is only an approximation of that format, but it's good
+enough for loading into xword. [1]
+
+  [1] apt-get install xword
+
+You need the Debian version 1.04 of xword.
+
+Note that this script was written with guesswork based on looking at
+example CCJ files."""
 
 import sys
 import re
