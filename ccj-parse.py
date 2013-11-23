@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # This script takes a .ccj file on standard input and can output the
@@ -56,8 +56,14 @@ def decode_bytes(b):
             return s
         raise Exception("Couldn't guess the character set.")
 
+def byte_at(data, i):
+    if isinstance(data, str):
+        return ord(data[i])
+    else:
+        return int(data[i])
+
 def read_string(data,start_index):
-    length = int(data[start_index])
+    length = byte_at(data, start_index)
     bytes_for_string = data[(start_index+1):(start_index+length+1)]
     s = decode_bytes(bytes_for_string)
     return (s,start_index+length+1)
@@ -67,11 +73,11 @@ def read_string(data,start_index):
 # I've seen:
 
 def skippable_block_of_four(data,start_index):
-    if data[start_index] == 0x00 and data[start_index+1] == 0xff and data[start_index+2] == 0xff and data[start_index+3] == 0xff:
+    if byte_at(data, start_index) == 0x00 and byte_at(data, start_index+1) == 0xff and byte_at(data, start_index+2) == 0xff and byte_at(data, start_index+3) == 0xff:
         return True
-    elif data[start_index] == 0x00 and data[start_index+1] == 0x00 and data[start_index+2] == 0xff and data[start_index+3] == 0xff:
+    elif byte_at(data, start_index) == 0x00 and byte_at(data, start_index+1) == 0x00 and byte_at(data, start_index+2) == 0xff and byte_at(data, start_index+3) == 0xff:
         return True
-    elif data[start_index] == 0x00 and data[start_index+1] == 0x00 and data[start_index+2] == 0x00 and data[start_index+3] == 0x00:
+    elif byte_at(data, start_index) == 0x00 and byte_at(data, start_index+1) == 0x00 and byte_at(data, start_index+2) == 0x00 and byte_at(data, start_index+3) == 0x00:
         return True
     else:
         return False
@@ -87,17 +93,17 @@ def read_clue_start_coordinates(data,start_index):
     # list of coordinates terminated by a NUL, otherwise it's just two
     # bytes with the coordinate:
     start_coordinates = []
-    if data[start_index] >= 0x80:
+    if byte_at(data, start_index) >= 0x80:
         i = start_index
-        while data[i] != 0:
-            x = reduce_coordinate(data[i])
-            y = reduce_coordinate(data[i+1])
+        while byte_at(data, i) != 0:
+            x = reduce_coordinate(byte_at(data, i))
+            y = reduce_coordinate(byte_at(data, i+1))
             start_coordinates.append( (x,y) )
             i += 2
         return (start_coordinates,i+1)
     else:
-        x = reduce_coordinate(data[start_index])
-        y = reduce_coordinate(data[start_index+1])
+        x = reduce_coordinate(byte_at(data, start_index))
+        y = reduce_coordinate(byte_at(data, start_index+1))
         start_coordinates.append( (x,y) )
         return (start_coordinates,start_index+2)
 
@@ -122,7 +128,7 @@ def parse_list_of_clues(data,start_index):
         print("  Before list of clues, got these unknown bytes:")
         for b in result.unknown_bytes:
             print("    "+str(b))
-    result.number_of_clues = data[i]
+    result.number_of_clues = byte_at(data, i)
     if options.verbose:
         print("number of clues is: "+str(result.number_of_clues))
     i += 1
@@ -142,7 +148,7 @@ def parse_list_of_clues(data,start_index):
             print("clue number: "+clue.number_string)
             print("all clue numbers: "+(", ".join(map(lambda x: str(x[0])+(x[1] and "A" or "D"), clue.all_clue_numbers))))
         # Skip a NUL:
-        if data[i] != 0:
+        if byte_at(data, i) != 0:
             raise Exception("After clue number we expect a NUL to skip over")
         i += 1
         clue.text_including_enumeration, i = read_string(data,i)
@@ -221,7 +227,7 @@ class ParsedCCJ:
         i = 2
 
         # I think these must be the list of buttons on the left:
-        while d[i] != 0:
+        while byte_at(d, i) != 0:
             s, i = read_string(d,i)
             if verbose:
                 print("got button string: "+s)
@@ -238,29 +244,29 @@ class ParsedCCJ:
         i += 1
 
         # I think we get the grid dimensions in the next two:
-        self.width = d[i]
+        self.width = byte_at(d, i)
         i += 1
 
-        self.height = d[i]
+        self.height = byte_at(d, i)
         i += 1
 
         self.grid = Grid(self.width,self.height)
 
         # Now skip over everything until we think we see the grid, since I've
         # no idea what it's meant to mean:
-        while d[i] != 0x3f and d[i] != 0x23:
+        while byte_at(d, i) != 0x3f and byte_at(d, i) != 0x23:
             i += 1
 
         for y in range(0,self.height):
             for x in range(0,self.width):
                 # Lights seem to be indicated by: '?' (or 'M' very occasionally)
-                if d[i] == 0x3f or d[i] == 0x4d:
+                if byte_at(d, i) == 0x3f or byte_at(d, i) == 0x4d:
                     self.grid.cells[y][x] = Cell(y,x)
                 # Blocked-out squares seem to be always '#'
-                elif d[i] == 0x23:
+                elif byte_at(d, i) == 0x23:
                     pass
                 else:
-                    raise Exception("Unknown value: "+str(d[i])+" at ("+str(x)+","+str(y)+")")
+                    raise Exception("Unknown value: "+str(byte_at(d, i))+" at ("+str(x)+","+str(y)+")")
                 i += 1
 
         if verbose:
@@ -273,20 +279,20 @@ class ParsedCCJ:
         for y in range(0,self.height):
             for x in range(0,self.width):
                 grid_unknown_purpose.cells[y][x] = Cell(y,x)
-                if d[i] == 0:
+                if byte_at(d, i) == 0:
                     grid_unknown_purpose.cells[y][x].set_letter(' ')
-                elif d[i] < 10:
-                    grid_unknown_purpose.cells[y][x].set_letter(str(d[i]))
+                elif byte_at(d, i) < 10:
+                    grid_unknown_purpose.cells[y][x].set_letter(str(byte_at(d, i)))
                 else:
-                    truncated = d[i] % 10
+                    truncated = byte_at(d, i) % 10
                     if verbose:
-                        print("Warning, truncating "+str(d[i])+" to "+str(truncated)+" at ("+str(x)+","+str(y)+")")
+                        print("Warning, truncating "+str(byte_at(d, i))+" to "+str(truncated)+" at ("+str(x)+","+str(y)+")")
                     grid_unknown_purpose.cells[y][x].set_letter(str(truncated))
                 i += 1
 
         # Seem to need to skip over an extra byte (0x01) here before the
         # answers.  Maybe it indicates whether there are answers next or not:
-        if d[i] != 1:
+        if byte_at(d, i) != 1:
             raise Exception("So far we expect a 0x01 before the answers...")
         i += 1
 
@@ -297,7 +303,7 @@ class ParsedCCJ:
         for y in range(0,self.height):
             for x in range(0,self.width):
                 if self.grid.cells[y][x]:
-                    self.grid.cells[y][x].set_letter(chr(d[i]))
+                    self.grid.cells[y][x].set_letter(chr(byte_at(d, i)))
                     i += 1
 
         if verbose:
@@ -313,8 +319,8 @@ class ParsedCCJ:
                 print("Skipped over "+str(skipped_blocks_of_four)+" blocks of 0x00 0xff 0xff 0xff")
 
         # I expect the next one to be 0x02:
-        if d[i] != 0x02:
-            raise Exception("Expect the first of the block of 16 always to be 0x02, in fact: "+str(d[i]))
+        if byte_at(d, i) != 0x02:
+            raise Exception("Expect the first of the block of 16 always to be 0x02, in fact: "+str(byte_at(d, i)))
 
         # Always just 16?
         i += 16
@@ -467,6 +473,10 @@ if __name__ == "__main__":
     parser.add_option('-c', '--copyright', dest='copyright',
                       help="specify the copyright message")
 
+    if sys.version_info < (3, 0):
+        for i, a in enumerate(sys.argv):
+            sys.argv[i] = a.decode('UTF-8')
+
     (options, args) = parser.parse_args()
 
     if len(args) > 0:
@@ -481,7 +491,7 @@ if __name__ == "__main__":
     parsed = ParsedCCJ()
 
     # Make sys.stdin binary:
-    parsed.read_from_ccj(sys.stdin.buffer,
+    parsed.read_from_ccj(io.open(sys.stdin.fileno(), 'rb'),
                          options.title,
                          options.author,
                          options.puzzle_number,
