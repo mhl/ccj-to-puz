@@ -50,6 +50,8 @@ def decode_bytes(bytes_to_decode):
     """
     bytes_to_decode = bytearray(c for c in bytearray(bytes_to_decode)
                                 if c not in (0x01, 0x02, 0x03))
+    if sys.version_info >= (3, 0):
+        bytes_to_decode = bytes(bytes_to_decode)
 
     for encoding in ('utf_8', 'latin_1', 'cp1252'):
         try:
