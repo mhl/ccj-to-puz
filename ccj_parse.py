@@ -28,11 +28,11 @@ import unicodedata
 
 from commonccj import Cell, Grid, clue_number_string_to_duple
 
-def contains_control_characters(s):
+def contains_control_characters(string):
     """Returns True if any control character is in s, otherwise False"""
-    return any(unicodedata.category(c) == 'Cc' for c in s)
+    return any(unicodedata.category(c) == 'Cc' for c in string)
 
-def decode_bytes(b):
+def decode_bytes(bytes_to_decode):
     """Try to decode bytes (in an unknown encoding) into a string
 
     I'm not sure about character set issues here, but it seems that
@@ -43,7 +43,7 @@ def decode_bytes(b):
     up if there are control characters left after decoding and
     replacing newlines with spaces."""
     bytes_to_decode = bytearray(filter(lambda c: c not in (0x01, 0x03),
-                                       bytearray(b)))
+                                       bytearray(bytes_to_decode)))
     for encoding in ('utf_8', 'latin_1', 'cp1252'):
         try:
             s = bytes_to_decode.decode(encoding)
