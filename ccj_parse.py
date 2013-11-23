@@ -498,6 +498,7 @@ class ParsedCCJ:
             f.write(nul)
 
 def ensure_sys_argv_is_decoded():
+    """Ensure that elements of sys.argv are decoded to Unicodeon Python 2"""
     if sys.version_info < (3, 0):
         for i, a in enumerate(sys.argv):
             sys.argv[i] = a.decode('UTF-8')
