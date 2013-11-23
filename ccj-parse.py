@@ -164,62 +164,6 @@ def keyfunc_clues(x):
         across_for_sorting = 0
     return ( x.all_clue_numbers[0][0], across_for_sorting )
 
-def write_to_file(width,
-                  height,
-                  across_clues,
-                  down_clues,
-                  grid,
-                  copyright,
-                  output_filename):
-    f = io.FileIO(output_filename,'wb')
-    f.write(bytearray(0x2C))
-    dimensions_etc = bytearray(2)
-    dimensions_etc[0] = width
-    dimensions_etc[1] = height
-    f.write(dimensions_etc)
-    f.write(struct.pack("<h",across_clues.real_number_of_clues()+down_clues.real_number_of_clues()))
-    f.write(bytearray(4))
-    solutions = bytearray(width*height)
-    empty_grid = bytearray(width*height)
-    i = 0
-    for y in range(0,height):
-        for x in range(0,width):
-            c = grid.cells[y][x]
-            if c:
-                solutions[i] = ord(c.letter)
-                empty_grid[i] = ord('-')
-            else:
-                solutions[i] = ord('.')
-                empty_grid[i] = ord('.')
-            i += 1
-    f.write(solutions)
-    f.write(empty_grid)
-    nul = bytearray(1)
-    f.write(title.encode('UTF-8'))
-    f.write(nul)
-    f.write(author.encode('UTF-8'))
-    f.write(nul)
-    f.write(copyright.encode('UTF-8'))
-    f.write(nul)
-    all_clues = across_clues.ordered_list_of_clues() + down_clues.ordered_list_of_clues()
-    all_clues.sort(key=keyfunc_clues)
-    for c in all_clues:
-        number_string_tidied = re.sub('/',',',c.number_string)
-        number_string_tidied = number_string_tidied.lower()
-        clue_text = c.tidied_text_including_enumeration()
-        # We have to stick the number string at the beginning
-        # otherwise it won't be clear when the answers to clues cover
-        # several entries in the grid.
-        f.write(("["+number_string_tidied+"] ").encode('UTF-8'))
-        # Encode the clue text as UTF-8, because it's not defined what
-        # the character set should be anywhere that I've seen.  (xword
-        # currently assumes ISO-8859-1, but that doesn't strike me as
-        # a good enough reason in itself, since it's easily patched.)
-        f.write(clue_text.encode('UTF-8'))
-        f.write(nul)
-    f.write(nul)
-    f.close()
-
 # A convenience class - we have one object of this class for all the
 # across clues and another object of this class for the down clues:
 
@@ -255,6 +199,257 @@ class IndependentClue:
             raise Exception("Trying to call self.set_number() before self.across is set")
         self.all_clue_numbers = list(map( lambda x: clue_number_string_to_duple(self.across,x), re.split('[,/]',clue_number_string)))
 
+class ParsedCCJ:
+
+    def __init__(self):
+        self.width = None
+        self.height = None
+        self.across_clues = None
+        self.down_clues = None
+        self.grid = None
+        self.title = None
+        self.author = None
+        self.copyright = None
+        self.setter = None
+        self.puzzle_number = None
+
+    def read_from_ccj(self, f, title, author, puzzle_number, copyright, verbose=False):
+
+        d = f.read()
+
+        # i is the index into the file for the rest of this script:
+        i = 2
+
+        # I think these must be the list of buttons on the left:
+        while d[i] != 0:
+            s, i = read_string(d,i)
+            if verbose:
+                print("got button string: "+s)
+
+        # Then the congratulations message, I think:
+        i += 1
+        s, i = read_string(d,i)
+
+        if verbose:
+            print("got congratulations message: "+s)
+
+        # Skip another byte; 0x02 in the Independent it seems, but 0x00 in the
+        # Herald puzzle I tried.
+        i += 1
+
+        # I think we get the grid dimensions in the next two:
+        self.width = d[i]
+        i += 1
+
+        self.height = d[i]
+        i += 1
+
+        self.grid = Grid(self.width,self.height)
+
+        # Now skip over everything until we think we see the grid, since I've
+        # no idea what it's meant to mean:
+        while d[i] != 0x3f and d[i] != 0x23:
+            i += 1
+
+        for y in range(0,self.height):
+            for x in range(0,self.width):
+                # Lights seem to be indicated by: '?' (or 'M' very occasionally)
+                if d[i] == 0x3f or d[i] == 0x4d:
+                    self.grid.cells[y][x] = Cell(y,x)
+                # Blocked-out squares seem to be always '#'
+                elif d[i] == 0x23:
+                    pass
+                else:
+                    raise Exception("Unknown value: "+str(d[i])+" at ("+str(x)+","+str(y)+")")
+                i += 1
+
+        if verbose:
+            print("grid is:\n"+self.grid.to_grid_string(True))
+
+        # Next there's a grid structure the purpose of which I don't
+        # understand:
+        grid_unknown_purpose = Grid(self.width,self.height)
+
+        for y in range(0,self.height):
+            for x in range(0,self.width):
+                grid_unknown_purpose.cells[y][x] = Cell(y,x)
+                if d[i] == 0:
+                    grid_unknown_purpose.cells[y][x].set_letter(' ')
+                elif d[i] < 10:
+                    grid_unknown_purpose.cells[y][x].set_letter(str(d[i]))
+                else:
+                    truncated = d[i] % 10
+                    if verbose:
+                        print("Warning, truncating "+str(d[i])+" to "+str(truncated)+" at ("+str(x)+","+str(y)+")")
+                    grid_unknown_purpose.cells[y][x].set_letter(str(truncated))
+                i += 1
+
+        # Seem to need to skip over an extra byte (0x01) here before the
+        # answers.  Maybe it indicates whether there are answers next or not:
+        if d[i] != 1:
+            raise Exception("So far we expect a 0x01 before the answers...")
+        i += 1
+
+        if verbose:
+            print("grid_unknown_purpose is:\n"+grid_unknown_purpose.to_grid_string(False))
+
+        # Now there's the grid with the answers:
+        for y in range(0,self.height):
+            for x in range(0,self.width):
+                if self.grid.cells[y][x]:
+                    self.grid.cells[y][x].set_letter(chr(d[i]))
+                    i += 1
+
+        if verbose:
+            print("grid with answers is:\n"+self.grid.to_grid_string(False))
+
+        skipped_blocks_of_four = 0
+        while skippable_block_of_four(d,i):
+            i += 4
+            skipped_blocks_of_four += 1
+
+        if skipped_blocks_of_four > 0:
+            if verbose:
+                print("Skipped over "+str(skipped_blocks_of_four)+" blocks of 0x00 0xff 0xff 0xff")
+
+        # I expect the next one to be 0x02:
+        if d[i] != 0x02:
+            raise Exception("Expect the first of the block of 16 always to be 0x02, in fact: "+str(d[i]))
+
+        # Always just 16?
+        i += 16
+
+        self.across_clues, i = parse_list_of_clues(d,i)
+
+        if verbose:
+            print("Now do down clues:")
+
+        self.down_clues, i = parse_list_of_clues(d,i)
+
+        m = re.search('^(.*)-([0-9]+)',self.across_clues.label)
+        if m:
+            self.setter = m.group(1)
+            self.puzzle_number = m.group(2)
+
+        if (not self.setter) and author:
+            self.setter = author
+        if (not self.puzzle_number) and puzzle_number:
+            self.puzzle_number = puzzle_number
+
+        self.title = "Crossword"
+        if title:
+            self.title = title
+
+        if self.setter and self.puzzle_number:
+            self.title += " "+self.puzzle_number+" / "+self.setter
+        elif self.setter:
+            self.title += " / "+self.setter
+        elif self.puzzle_number:
+            self.title += " "+self.puzzle_number
+
+        if date_string:
+            self.title += " ("+date_string+")"
+
+        self.author = "Unknown Setter"
+        if author:
+            self.author = author
+
+        self.copyright = "© Unknown"
+        print("copyright is:", copyright)
+        if copyright:
+            self.copyright = copyright
+
+        # In the AcrossLite .PUZ format we need to make sure that there's one
+        # "clue" for each clue number, even if it's just "See 6" for clues
+        # whose answers are split over different clue numbers in the grid.
+
+        # So, go through the clue dictionaries and make sure that there is
+        # something for every clue.  (So we don't miss the "See 6" type of
+        # clue.)
+
+        for across in (True,False):
+            clue_dictionary = None
+            if across:
+                clue_dictionary = self.across_clues.clue_dictionary
+            else:
+                clue_dictionary = self.down_clues.clue_dictionary
+            values = list(clue_dictionary.values())
+            for c in values:
+                original_clue_duple = c.all_clue_numbers[0]
+                for l in c.all_clue_numbers:
+                    # l should be a duple of clue number and an "across"
+                    # boolean:
+                    n = l[0]
+                    a = l[1]
+                    expected_dictionary = None
+                    clue_string = "See "+str(original_clue_duple[0])
+                    if a:
+                        expected_dictionary = self.across_clues.clue_dictionary
+                    else:
+                        expected_dictionary = self.down_clues.clue_dictionary
+                    if a != across:
+                        clue_string += a and " across" or " down"
+                    ekeys = list(expected_dictionary.keys())
+                    if not n in ekeys:
+                        fake_clue = IndependentClue()
+                        fake_clue.across = a
+                        fake_clue.text_including_enumeration = clue_string
+                        fake_clue.set_number(str(n))
+                        expected_dictionary[n] = fake_clue
+                        if verbose:
+                            print("**** Added missing clue with index "+str(n)+" "+fake_clue.tidied_text_including_enumeration())
+
+    def write_to_puz_file(self, output_filename):
+        f = io.FileIO(output_filename,'wb')
+        f.write(bytearray(0x2C))
+        dimensions_etc = bytearray(2)
+        dimensions_etc[0] = self.width
+        dimensions_etc[1] = self.height
+        f.write(dimensions_etc)
+        f.write(struct.pack("<h",self.across_clues.real_number_of_clues()+self.down_clues.real_number_of_clues()))
+        f.write(bytearray(4))
+        solutions = bytearray(self.width*self.height)
+        empty_grid = bytearray(self.width*self.height)
+        i = 0
+        for y in range(0,self.height):
+            for x in range(0,self.width):
+                c = self.grid.cells[y][x]
+                if c:
+                    solutions[i] = ord(c.letter)
+                    empty_grid[i] = ord('-')
+                else:
+                    solutions[i] = ord('.')
+                    empty_grid[i] = ord('.')
+                i += 1
+        f.write(solutions)
+        f.write(empty_grid)
+        nul = bytearray(1)
+        f.write(self.title.encode('UTF-8'))
+        f.write(nul)
+        f.write(self.author.encode('UTF-8'))
+        f.write(nul)
+        f.write(self.copyright.encode('UTF-8'))
+        f.write(nul)
+        all_clues = self.across_clues.ordered_list_of_clues() + self.down_clues.ordered_list_of_clues()
+        all_clues.sort(key=keyfunc_clues)
+        for c in all_clues:
+            number_string_tidied = re.sub('/',',',c.number_string)
+            number_string_tidied = number_string_tidied.lower()
+            clue_text = c.tidied_text_including_enumeration()
+            # We have to stick the number string at the beginning
+            # otherwise it won't be clear when the answers to clues cover
+            # several entries in the grid.
+            f.write(("["+number_string_tidied+"] ").encode('UTF-8'))
+            # Encode the clue text as UTF-8, because it's not defined what
+            # the character set should be anywhere that I've seen.  (xword
+            # currently assumes ISO-8859-1, but that doesn't strike me as
+            # a good enough reason in itself, since it's easily patched.)
+            f.write(clue_text.encode('UTF-8'))
+            f.write(nul)
+        f.write(nul)
+        f.close()
+
+
 if __name__ == "__main__":
 
     parser = OptionParser()
@@ -275,198 +470,24 @@ if __name__ == "__main__":
 
     (options, args) = parser.parse_args()
 
+    if len(args) > 0:
+        raise Exception("Unknown arguments: " + "\n".join(args))
+
     date_string = None
     if options.date:
         if not re.search("^\d{4}-\d{2}-\d{2}",options.date):
             raise Exception("Unknown date format, must be YYYY-MM-DD")
         date_string = options.date
 
+    parsed = ParsedCCJ()
+
     # Make sys.stdin binary:
-    d = sys.stdin.buffer.read()
-
-    # i is the index into the file for the rest of this script:
-    i = 2
-
-    # I think these must be the list of buttons on the left:
-    while d[i] != 0:
-        s, i = read_string(d,i)
-        if options.verbose:
-            print("got button string: "+s)
-
-    # Then the congratulations message, I think:
-    i += 1
-    s, i = read_string(d,i)
-
-    if options.verbose:
-        print("got congratulations message: "+s)
-
-    # Skip another byte; 0x02 in the Independent it seems, but 0x00 in the
-    # Herald puzzle I tried.
-    i += 1
-
-    # I think we get the grid dimensions in the next two:
-    width = d[i]
-    i += 1
-
-    height = d[i]
-    i += 1
-
-    grid = Grid(width,height)
-
-    # Now skip over everything until we think we see the grid, since I've
-    # no idea what it's meant to mean:
-    while d[i] != 0x3f and d[i] != 0x23:
-        i += 1
-
-    for y in range(0,height):
-        for x in range(0,width):
-            # Lights seem to be indicated by: '?' (or 'M' very occasionally)
-            if d[i] == 0x3f or d[i] == 0x4d:
-                grid.cells[y][x] = Cell(y,x)
-            # Blocked-out squares seem to be always '#'
-            elif d[i] == 0x23:
-                pass
-            else:
-                raise Exception("Unknown value: "+str(d[i])+" at ("+str(x)+","+str(y)+")")
-            i += 1
-
-    if options.verbose:
-        print("grid is:\n"+grid.to_grid_string(True))
-
-    # Next there's a grid structure the purpose of which I don't
-    # understand:
-    grid_unknown_purpose = Grid(width,height)
-
-    for y in range(0,height):
-        for x in range(0,width):
-            grid_unknown_purpose.cells[y][x] = Cell(y,x)
-            if d[i] == 0:
-                grid_unknown_purpose.cells[y][x].set_letter(' ')
-            elif d[i] < 10:
-                grid_unknown_purpose.cells[y][x].set_letter(str(d[i]))
-            else:
-                truncated = d[i] % 10
-                if options.verbose:
-                    print("Warning, truncating "+str(d[i])+" to "+str(truncated)+" at ("+str(x)+","+str(y)+")")
-                grid_unknown_purpose.cells[y][x].set_letter(str(truncated))
-            i += 1
-
-    # Seem to need to skip over an extra byte (0x01) here before the
-    # answers.  Maybe it indicates whether there are answers next or not:
-    if d[i] != 1:
-        raise Exception("So far we expect a 0x01 before the answers...")
-    i += 1
-
-    if options.verbose:
-        print("grid_unknown_purpose is:\n"+grid_unknown_purpose.to_grid_string(False))
-
-    # Now there's the grid with the answers:
-    for y in range(0,height):
-        for x in range(0,width):
-            if grid.cells[y][x]:
-                grid.cells[y][x].set_letter(chr(d[i]))
-                i += 1
-
-    if options.verbose:
-        print("grid with answers is:\n"+grid.to_grid_string(False))
-
-    skipped_blocks_of_four = 0
-    while skippable_block_of_four(d,i):
-        i += 4
-        skipped_blocks_of_four += 1
-
-    if skipped_blocks_of_four > 0:
-        if options.verbose:
-            print("Skipped over "+str(skipped_blocks_of_four)+" blocks of 0x00 0xff 0xff 0xff")
-
-    # I expect the next one to be 0x02:
-    if d[i] != 0x02:
-        raise Exception("Expect the first of the block of 16 always to be 0x02, in fact: "+str(d[i]))
-
-    # Always just 16?
-    i += 16
-
-    across_clues, i = parse_list_of_clues(d,i)
-
-    if options.verbose:
-        print("Now do down clues:")
-
-    down_clues, i = parse_list_of_clues(d,i)
-
-    setter = None
-    puzzle_number = None
-
-    m = re.search('^(.*)-([0-9]+)',across_clues.label)
-    if m:
-        setter = m.group(1)
-        puzzle_number = m.group(2)
-
-    if (not setter) and options.author:
-        setter = options.author
-    if (not puzzle_number) and options.puzzle_number:
-        puzzle_number = option.puzzle_number
-
-    title = "Crossword"
-    if options.title:
-        title = options.title
-
-    if setter and puzzle_number:
-        title += " "+puzzle_number+" / "+setter
-    elif setter:
-        title += " / "+setter
-    elif puzzle_number:
-        title += " "+puzzle_number
-
-    if date_string:
-        title += " ("+date_string+")"
-
-    author = "Unknown Setter"
-    if options.author:
-        author = options.author
-
-    copyright = "© Unknown"
-    if options.copyright:
-        copyright = options.copyright
-
-    # In the AcrossLite .PUZ format we need to make sure that there's one
-    # "clue" for each clue number, even if it's just "See 6" for clues
-    # whose answers are split over different clue numbers in the grid.
-
-    # So, go through the clue dictionaries and make sure that there is
-    # something for every clue.  (So we don't miss the "See 6" type of
-    # clue.)
-
-    for across in (True,False):
-        clue_dictionary = None
-        if across:
-            clue_dictionary = across_clues.clue_dictionary
-        else:
-            clue_dictionary = down_clues.clue_dictionary
-        values = list(clue_dictionary.values())
-        for c in values:
-            original_clue_duple = c.all_clue_numbers[0]
-            for l in c.all_clue_numbers:
-                # l should be a duple of clue number and an "across"
-                # boolean:
-                n = l[0]
-                a = l[1]
-                expected_dictionary = None
-                clue_string = "See "+str(original_clue_duple[0])
-                if a:
-                    expected_dictionary = across_clues.clue_dictionary
-                else:
-                    expected_dictionary = down_clues.clue_dictionary
-                if a != across:
-                    clue_string += a and " across" or " down"
-                ekeys = list(expected_dictionary.keys())
-                if not n in ekeys:
-                    fake_clue = IndependentClue()
-                    fake_clue.across = a
-                    fake_clue.text_including_enumeration = clue_string
-                    fake_clue.set_number(str(n))
-                    expected_dictionary[n] = fake_clue
-                    if options.verbose:
-                        print("**** Added missing clue with index "+str(n)+" "+fake_clue.tidied_text_including_enumeration())
+    parsed.read_from_ccj(sys.stdin.buffer,
+                         options.title,
+                         options.author,
+                         options.puzzle_number,
+                         options.copyright,
+                         options.verbose)
 
     # Output to something like the .PUZ format used by AcrossLite.  I only
     # care about loading this into xword, so I'm not bothering to
@@ -474,10 +495,4 @@ if __name__ == "__main__":
     # can be found here: http://joshisanerd.com/puz/
 
     if options.output_filename:
-        write_to_file(width,
-                      height,
-                      across_clues,
-                      down_clues,
-                      grid,
-                      copyright,
-                      options.output_filename)
+        parsed.write_to_puz_file(options.output_filename)
