@@ -118,7 +118,9 @@ def parse_list_of_clues(data, start_index):
     elif re.search(r'(?ims)down', result.label):
         result.across = False
     else:
-        raise Exception("Couldn't find either /across/i or /down/i in label: '" + str(result.label) + "'")
+        message = "Couldn't find either 'across' or 'down' in label: '{0}'"
+        raise Exception(message.format(result.label))
+
     # Skip some bytes:
     result.unknown_bytes = data[i:(i + 3)]
     i += 3
@@ -144,7 +146,9 @@ def parse_list_of_clues(data, start_index):
         clue.set_number(s)
         if options.verbose:
             print("clue number: " + clue.number_string)
-            print("all clue numbers: " + (", ".join(map(lambda x: str(x[0]) + (x[1] and "A" or "D"), clue.all_clue_numbers))))
+            print("all clue numbers:",
+                  ", ".join(map(lambda x: str(x[0]) + (x[1] and "A" or "D"),
+                                clue.all_clue_numbers)))
         # Skip a NUL:
         if byte_at(data, i) != 0:
             raise Exception("After clue number we expect a NUL to skip over")
@@ -167,6 +171,9 @@ def keyfunc_clues(x):
     if x.across:
         across_for_sorting = 0
     return ( x.all_clue_numbers[0][0], across_for_sorting )
+
+def coord_str(x, y):
+    return "({0}, {1})".format(x, y)
 
 # A convenience class - we have one object of this class for all the
 # across clues and another object of this class for the down clues:
@@ -200,8 +207,11 @@ class IndependentClue:
     def set_number(self, clue_number_string):
         self.number_string = clue_number_string
         if self.across == None:
-            raise Exception("Trying to call self.set_number() before self.across is set")
-        self.all_clue_numbers = list(map( lambda x: clue_number_string_to_duple(self.across, x), re.split(r'[,/]', clue_number_string)))
+            msg = "Trying to call self.set_number() before self.across is set"
+            raise Exception(msg)
+        self.all_clue_numbers = list(
+            map(lambda x: clue_number_string_to_duple(self.across, x),
+                re.split(r'[,/]', clue_number_string)))
 
 class ParsedCCJ:
 
@@ -217,7 +227,13 @@ class ParsedCCJ:
         self.setter = None
         self.puzzle_number = None
 
-    def read_from_ccj(self, f, title, author, puzzle_number, copyright, verbose=False):
+    def read_from_ccj(self,
+                      f,
+                      title,
+                      author,
+                      puzzle_number,
+                      copyright,
+                      verbose=False):
 
         d = f.read()
 
@@ -264,7 +280,9 @@ class ParsedCCJ:
                 elif byte_at(d, i) == 0x23:
                     pass
                 else:
-                    raise Exception("Unknown value: " + str(byte_at(d, i)) + " at (" + str(x) + "," + str(y) + ")")
+                    message = "Unknown value {0} at {1}"
+                    raise Exception(message.format(str(byte_at(d, i)),
+                                                   coord_str(x, y)))
                 i += 1
 
         if verbose:
@@ -280,12 +298,16 @@ class ParsedCCJ:
                 if byte_at(d, i) == 0:
                     grid_unknown_purpose.cells[y][x].set_letter(' ')
                 elif byte_at(d, i) < 10:
-                    grid_unknown_purpose.cells[y][x].set_letter(str(byte_at(d, i)))
+                    letter = str(byte_at(d, i))
+                    grid_unknown_purpose.cells[y][x].set_letter(letter)
                 else:
-                    truncated = byte_at(d, i) % 10
+                    truncated = str(byte_at(d, i) % 10)
                     if verbose:
-                        print("Warning, truncating " + str(byte_at(d, i)) + " to " + str(truncated) + " at (" + str(x) + "," + str(y) + ")")
-                    grid_unknown_purpose.cells[y][x].set_letter(str(truncated))
+                        message = "Warning, truncating {0} to {1} at {2}"
+                        print(message.format(byte_at(d, i),
+                                             truncated,
+                                             coord_str(x, y)))
+                    grid_unknown_purpose.cells[y][x].set_letter(truncated)
                 i += 1
 
         # Seem to need to skip over an extra byte (0x01) here before the
@@ -295,7 +317,8 @@ class ParsedCCJ:
         i += 1
 
         if verbose:
-            print("grid_unknown_purpose is:\n" + grid_unknown_purpose.to_grid_string(False))
+            print("grid_unknown_purpose is:\n" +
+                  grid_unknown_purpose.to_grid_string(False))
 
         # Now there's the grid with the answers:
         for y in range(0, self.height):
@@ -314,11 +337,15 @@ class ParsedCCJ:
 
         if skipped_blocks_of_four > 0:
             if verbose:
-                print("Skipped over " + str(skipped_blocks_of_four) + " blocks of 0x00 0xff 0xff 0xff")
+                print("Skipped over",
+                      str(skipped_blocks_of_four),
+                      "ignorable blocks")
 
         # I expect the next one to be 0x02:
         if byte_at(d, i) != 0x02:
-            raise Exception("Expect the first of the block of 16 always to be 0x02, in fact: " + str(byte_at(d, i)))
+            message = "Expect the first of the block of 16 always to be 0x02, "
+            message += "in fact was: {0}"
+            raise Exception(message.format(byte_at(d, i)))
 
         # Always just 16?
         i += 16
@@ -400,7 +427,8 @@ class ParsedCCJ:
                         fake_clue.set_number(str(n))
                         expected_dictionary[n] = fake_clue
                         if verbose:
-                            print("**** Added missing clue with index " + str(n) + " " + fake_clue.tidied_text_including_enumeration())
+                            print("**** Added missing clue with index ", str(n),
+                                  fake_clue.tidied_text_including_enumeration())
 
     def write_to_puz_file(self, output_filename):
         f = io.FileIO(output_filename, 'wb')
@@ -409,7 +437,9 @@ class ParsedCCJ:
         dimensions_etc[0] = self.width
         dimensions_etc[1] = self.height
         f.write(dimensions_etc)
-        f.write(struct.pack("<h", self.across_clues.real_number_of_clues() + self.down_clues.real_number_of_clues()))
+        f.write(struct.pack("<h",
+                            self.across_clues.real_number_of_clues() +
+                            self.down_clues.real_number_of_clues()))
         f.write(bytearray(4))
         solutions = bytearray(self.width*self.height)
         empty_grid = bytearray(self.width*self.height)
@@ -433,7 +463,9 @@ class ParsedCCJ:
         f.write(nul)
         f.write(self.copyright.encode('UTF-8'))
         f.write(nul)
-        all_clues = self.across_clues.ordered_list_of_clues() + self.down_clues.ordered_list_of_clues()
+        all_clues = self.across_clues.ordered_list_of_clues()
+        all_clues += self.down_clues.ordered_list_of_clues()
+
         all_clues.sort(key=keyfunc_clues)
         for c in all_clues:
             number_string_tidied = re.sub(r'/', ',', c.number_string)
