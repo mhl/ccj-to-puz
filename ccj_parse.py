@@ -41,9 +41,15 @@ def decode_bytes(bytes_to_decode):
     remove any 0x01 or 0x03 bytes first.  Then try UTF-8 decoding - if
     that doesn't succeed, try Windows 1252 and then ISO-8859-1, giving
     up if there are control characters left after decoding and
-    replacing newlines with spaces."""
+    replacing newlines with spaces.  0x02 might be bold, perhaps?
+    e.g.  in Independent June 26th 2008 there's 'Unwise<b>r</b?'
+    represented by
+
+      55 6e 77 69 73 65 02 72 01 3f 01 01 20 28 39 29
+      U  n  w  i  s  e     r     ?           (  9  )
+    """
     bytes_to_decode = bytearray(c for c in bytearray(bytes_to_decode)
-                                if c not in (0x01, 0x03))
+                                if c not in (0x01, 0x02, 0x03))
 
     for encoding in ('utf_8', 'latin_1', 'cp1252'):
         try:
