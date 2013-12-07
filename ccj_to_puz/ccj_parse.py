@@ -512,8 +512,7 @@ def ensure_sys_argv_is_decoded():
         for i, a in enumerate(sys.argv):
             sys.argv[i] = a.decode('UTF-8')
 
-if __name__ == "__main__":
-
+def main():
     parser = OptionParser()
     parser.add_option('-o', "--output", dest="output_filename",
                       default=False, help="output in a broken .PUZ format")
@@ -559,3 +558,6 @@ if __name__ == "__main__":
 
     if options.output_filename:
         parsed.write_to_puz_file(options.output_filename, options.verbose)
+
+if __name__ == "__main__":
+    main()
