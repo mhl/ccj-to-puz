@@ -19,6 +19,7 @@ You need the Debian version 1.04 of xword.
 Note that this script was written with guesswork based on looking at
 example CCJ files."""
 
+import copy
 import sys
 import re
 from optparse import OptionParser
@@ -407,6 +408,13 @@ class ParsedCCJ:
         if copyright_message:
             self.copyright_message = copyright_message
 
+    def write_to_puz_file(self, output_filename, verbose=False):
+        """Write the crossword in AcrossLite .puz format to output_filename
+
+        Note that the version for the file format that this outputs
+        doesn't include checksums, so a strict loader will reject such
+        a file - it's fine in xword, though."""
+
         # In the AcrossLite .PUZ format we need to make sure that there's one
         # "clue" for each clue number, even if it's just "See 6" for clues
         # whose answers are split over different clue numbers in the grid.
@@ -415,11 +423,15 @@ class ParsedCCJ:
         # something for every clue.  (So we don't miss the "See 6" type of
         # clue.)
 
+        # We take a deep copy of the across clues and down clues first
+        # so that we don't add unnecessary fake clues to the
+        # attributes of this instance.
+        clue_groups = {
+            True: copy.deepcopy(self.across_clues),
+            False: copy.deepcopy(self.down_clues)}
+
         for group_across in (True, False):
-            clue_dictionary = {
-                True: self.across_clues.clue_dictionary,
-                False: self.down_clues.clue_dictionary
-            }[group_across]
+            clue_dictionary = clue_groups[group_across].clue_dictionary
             for clue in clue_dictionary.values():
                 first_clue_entry = str(clue.all_clue_numbers[0][0])
                 for entry_n, entry_across in clue.all_clue_numbers:
@@ -427,8 +439,8 @@ class ParsedCCJ:
                     if entry_across != group_across:
                         clue_string += entry_across and " across" or " down"
                     expected_dictionary = {
-                        True: self.across_clues.clue_dictionary,
-                        False: self.down_clues.clue_dictionary
+                        True: clue_groups[True].clue_dictionary,
+                        False: clue_groups[False].clue_dictionary
                     }[entry_across]
                     if entry_n not in expected_dictionary.keys():
                         fake_clue = ParsedClue()
@@ -440,12 +452,7 @@ class ParsedCCJ:
                             print("**** Added missing clue with index ", str(entry_n),
                                   fake_clue.tidied_text_including_enumeration())
 
-    def write_to_puz_file(self, output_filename):
-        """Write the crossword in AcrossLite .puz format to output_filename
-
-        Note that the version for the file format that this outputs
-        doesn't include checksums, so a strict loader will reject such
-        a file - it's fine in xword, though."""
+        # Now the file can be written out:
 
         with io.FileIO(output_filename, 'wb') as f:
             f.write(bytearray(0x2C))
@@ -454,8 +461,8 @@ class ParsedCCJ:
             dimensions_etc[1] = self.height
             f.write(dimensions_etc)
             f.write(struct.pack("<h",
-                                self.across_clues.real_number_of_clues() +
-                                self.down_clues.real_number_of_clues()))
+                                clue_groups[True].real_number_of_clues() +
+                                clue_groups[False].real_number_of_clues()))
             f.write(bytearray(4))
             solutions = bytearray(self.width*self.height)
             empty_grid = bytearray(self.width*self.height)
@@ -479,8 +486,8 @@ class ParsedCCJ:
             f.write(nul)
             f.write(self.copyright_message.encode('UTF-8'))
             f.write(nul)
-            all_clues = self.across_clues.ordered_list_of_clues()
-            all_clues += self.down_clues.ordered_list_of_clues()
+            all_clues = clue_groups[True].ordered_list_of_clues()
+            all_clues += clue_groups[False].ordered_list_of_clues()
 
             all_clues.sort(key=keyfunc_clues)
             for c in all_clues:
@@ -551,4 +558,4 @@ if __name__ == "__main__":
     # can be found here: http://joshisanerd.com/puz/
 
     if options.output_filename:
-        parsed.write_to_puz_file(options.output_filename)
+        parsed.write_to_puz_file(options.output_filename, options.verbose)
