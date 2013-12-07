@@ -121,12 +121,12 @@ def read_clue_start_coordinates(data, start_index):
         start_coordinates.append((x, y))
         return (start_coordinates, start_index + 2)
 
-def parse_list_of_clues(data, start_index):
+def parse_list_of_clues(data, start_index, verbose=False):
     result = ListOfClues()
     i = start_index
     # Read the label for this list of clues:
     result.label, i = read_string(data, i)
-    if options.verbose:
+    if verbose:
         print("clue set label is:", result.label)
     result.across = None
     if re.search(r'(?ims)across', result.label):
@@ -140,27 +140,27 @@ def parse_list_of_clues(data, start_index):
     # Skip some bytes:
     result.unknown_bytes = data[i:(i + 3)]
     i += 3
-    if options.verbose:
+    if verbose:
         print("  Before list of clues, got these unknown bytes:")
         for b in result.unknown_bytes:
             print("    " + str(b))
     result.number_of_clues = byte_at(data, i)
-    if options.verbose:
+    if verbose:
         print("number of clues is: " + str(result.number_of_clues))
     i += 1
     clues_found = 0
     while True:
-        if options.verbose:
+        if verbose:
             print("--------------------------")
         clue = ParsedClue()
         clue.across = result.across
         clue.start_coordinates, i = read_clue_start_coordinates(data, i)
-        if options.verbose:
+        if verbose:
             for c in clue.start_coordinates:
                 print("A start at x: " + str(c[0]) + ", y: " + str(c[1]))
         s, i = read_string(data, i)
         clue.set_number(s)
-        if options.verbose:
+        if verbose:
             print("clue number: " + clue.number_string)
             print("all clue numbers:",
                   ", ".join(str(x[0]) + (x[1] and "A" or "D")
@@ -170,7 +170,7 @@ def parse_list_of_clues(data, start_index):
             raise Exception("After clue number we expect a NUL to skip over")
         i += 1
         clue.text_including_enumeration, i = read_string(data, i)
-        if options.verbose:
+        if verbose:
             print("clue text:", clue.text_including_enumeration)
         result.clue_dictionary[clue.all_clue_numbers[0][0]] = clue
         clues_found += 1
@@ -245,6 +245,7 @@ class ParsedCCJ:
         self.copyright_message = None
         self.setter = None
         self.puzzle_number = None
+        self.date_string = None
 
     def read_from_ccj(self,
                       f,
@@ -252,6 +253,7 @@ class ParsedCCJ:
                       author,
                       puzzle_number,
                       copyright_message,
+                      date_string,
                       verbose=False):
 
         d = f.read()
@@ -369,7 +371,7 @@ class ParsedCCJ:
         # Always just 16?
         i += 16
 
-        self.across_clues, i = parse_list_of_clues(d, i)
+        self.across_clues, i = parse_list_of_clues(d, i, verbose)
 
         if verbose:
             print("Now do down clues:")
@@ -549,6 +551,7 @@ def main():
                          options.author,
                          options.puzzle_number,
                          options.copyright_message,
+                         date_string,
                          options.verbose)
 
     # Output to something like the .PUZ format used by AcrossLite.  I only
