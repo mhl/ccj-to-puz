@@ -415,37 +415,29 @@ class ParsedCCJ:
         # something for every clue.  (So we don't miss the "See 6" type of
         # clue.)
 
-        for across in (True, False):
-            clue_dictionary = None
-            if across:
-                clue_dictionary = self.across_clues.clue_dictionary
-            else:
-                clue_dictionary = self.down_clues.clue_dictionary
-            values = list(clue_dictionary.values())
-            for c in values:
-                original_clue_duple = c.all_clue_numbers[0]
-                for l in c.all_clue_numbers:
-                    # l should be a duple of clue number and an "across"
-                    # boolean:
-                    n = l[0]
-                    a = l[1]
-                    expected_dictionary = None
-                    clue_string = "See " + str(original_clue_duple[0])
-                    if a:
-                        expected_dictionary = self.across_clues.clue_dictionary
-                    else:
-                        expected_dictionary = self.down_clues.clue_dictionary
-                    if a != across:
-                        clue_string += a and " across" or " down"
-                    ekeys = list(expected_dictionary.keys())
-                    if not n in ekeys:
+        for group_across in (True, False):
+            clue_dictionary = {
+                True: self.across_clues.clue_dictionary,
+                False: self.down_clues.clue_dictionary
+            }[group_across]
+            for clue in clue_dictionary.values():
+                first_clue_entry = str(clue.all_clue_numbers[0][0])
+                for entry_n, entry_across in clue.all_clue_numbers:
+                    clue_string = "See " + first_clue_entry
+                    if entry_across != group_across:
+                        clue_string += entry_across and " across" or " down"
+                    expected_dictionary = {
+                        True: self.across_clues.clue_dictionary,
+                        False: self.down_clues.clue_dictionary
+                    }[entry_across]
+                    if entry_n not in expected_dictionary.keys():
                         fake_clue = ParsedClue()
-                        fake_clue.across = a
+                        fake_clue.across = entry_across
                         fake_clue.text_including_enumeration = clue_string
-                        fake_clue.set_number(str(n))
-                        expected_dictionary[n] = fake_clue
+                        fake_clue.set_number(str(entry_n))
+                        expected_dictionary[entry_n] = fake_clue
                         if verbose:
-                            print("**** Added missing clue with index ", str(n),
+                            print("**** Added missing clue with index ", str(entry_n),
                                   fake_clue.tidied_text_including_enumeration())
 
     def write_to_puz_file(self, output_filename):
