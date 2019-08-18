@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 setup(
     name = "ccj-to-puz",
-    version = "0.1",
+    version = "0.3",
     packages = find_packages(),
     author = "Mark Longair",
     author_email = "mark-python@longair.net",

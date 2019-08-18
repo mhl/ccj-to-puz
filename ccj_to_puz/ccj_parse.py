@@ -19,6 +19,8 @@ You need the Debian version 1.04 of xword.
 Note that this script was written with guesswork based on looking at
 example CCJ files."""
 
+from __future__ import print_function
+
 import copy
 import sys
 import re
@@ -121,7 +123,7 @@ def read_clue_start_coordinates(data, start_index):
         start_coordinates.append((x, y))
         return (start_coordinates, start_index + 2)
 
-def parse_list_of_clues(data, start_index, verbose=False):
+def parse_list_of_clues(data, start_index, grid, verbose=False):
     result = ListOfClues()
     i = start_index
     # Read the label for this list of clues:
@@ -159,7 +161,7 @@ def parse_list_of_clues(data, start_index, verbose=False):
             for c in clue.start_coordinates:
                 print("A start at x: " + str(c[0]) + ", y: " + str(c[1]))
         s, i = read_string(data, i)
-        clue.set_number(s)
+        clue.set_number(s, grid)
         if verbose:
             print("clue number: " + clue.number_string)
             print("all clue numbers:",
@@ -222,12 +224,22 @@ class ParsedClue:
         t = re.sub(r'[\x00-\x1f]', '', self.text_including_enumeration)
         t = re.sub(r' *\(', ' (', t)
         return t
-    def set_number(self, clue_number_string):
+    # Typically this looks like "5", "24", or for multiple entries
+    # "4/12" - there can also be a disambiguating A or D afterwards,
+    # e.g. in the Independent from 2012-06-04 there is "9/14D".  The A
+    # or D only seems to be present where it is otherwise impossible
+    # to infer the direction of one of the clues.  e.g. in the
+    # Independent from 2013-12-05 there is in the down clues a "6/24",
+    # to mean 6D/24A, but you should be able to tell because there's
+    # only a 24A, and no 24D in the grid. (2013-11-14 also has a
+    # difficult case: "33/16/12/2A/28D".
+    def set_number(self, clue_number_string, grid):
+        print("clue_number_string is:", clue_number_string)
         self.number_string = clue_number_string
         if self.across == None:
             msg = "Trying to call self.set_number() before self.across is set"
             raise Exception(msg)
-        self.all_clue_numbers = [clue_number_string_to_duple(self.across, x)
+        self.all_clue_numbers = [clue_number_string_to_duple(self.across, x, grid)
                                  for x in
                                  re.split(r'[,/]', clue_number_string)]
 
@@ -309,6 +321,10 @@ class ParsedCCJ:
         if verbose:
             print("grid is:\n" + self.grid.to_grid_string(True))
 
+        # Now tell the grid to work out where each clue number should
+        # be:
+        self.grid.set_numbers()
+
         # Next there's a grid structure the purpose of which I don't
         # understand:
         grid_unknown_purpose = Grid(self.width, self.height)
@@ -371,12 +387,12 @@ class ParsedCCJ:
         # Always just 16?
         i += 16
 
-        self.across_clues, i = parse_list_of_clues(d, i, verbose)
+        self.across_clues, i = parse_list_of_clues(d, i, self.grid, verbose)
 
         if verbose:
             print("Now do down clues:")
 
-        self.down_clues, i = parse_list_of_clues(d, i)
+        self.down_clues, i = parse_list_of_clues(d, i, self.grid, verbose)
 
         m = re.search(r'^(.*)-([0-9]+)', self.across_clues.label)
         if m:
@@ -448,7 +464,7 @@ class ParsedCCJ:
                         fake_clue = ParsedClue()
                         fake_clue.across = entry_across
                         fake_clue.text_including_enumeration = clue_string
-                        fake_clue.set_number(str(entry_n))
+                        fake_clue.set_number(str(entry_n), self.grid)
                         expected_dictionary[entry_n] = fake_clue
                         if verbose:
                             print("**** Added missing clue with index ", str(entry_n),
