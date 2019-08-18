@@ -268,6 +268,11 @@ class ParsedCCJ:
                       date_string,
                       verbose=False):
 
+        # Cope with puzzle number being passed in as a number rather
+        # than a string:
+        if puzzle_number is not None:
+            puzzle_number = str(puzzle_number)
+
         d = f.read()
 
         # i is the index into the file for the rest of this script:
